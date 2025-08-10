@@ -2,7 +2,7 @@ services:
   - type: web
     name: ai-study-companion
     env: node
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build && ls -la dist/
     startCommand: npm start
     plan: free
     envVars:
