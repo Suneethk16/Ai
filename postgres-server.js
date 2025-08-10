@@ -747,7 +747,8 @@ function App() {
         setError(result.error);
       }
     } catch (err) {
-      setError('Failed to send OTP');
+      console.error('Send OTP error:', err);
+      setError('Failed to send OTP. Please check your email and try again.');
     }
   };
   
@@ -770,7 +771,8 @@ function App() {
         setError(result.error);
       }
     } catch (err) {
-      setError('Failed to verify OTP');
+      console.error('Verify OTP error:', err);
+      setError('Failed to verify OTP. Please try again.');
     }
   };
   
@@ -820,7 +822,11 @@ function App() {
       }
     } catch (err) {
       console.error('Auth error:', err);
-      setError('Connection failed. Please try again.');
+      if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError('Server is not responding. Please try again in a moment.');
+      } else {
+        setError('Connection failed. Please check your internet and try again.');
+      }
     }
   };
   
@@ -996,4 +1002,18 @@ ReactDOM.render(React.createElement(App), document.getElementById('root'));
 </script></body></html>`);
 });
 
-app.listen(PORT, () => console.log('PostgreSQL server running on port ' + PORT));
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString(), port: PORT });
+});
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ success: true, message: 'Server is working', storage: usePostgres ? 'postgresql' : 'memory' });
+});
+
+app.listen(PORT, () => {
+  console.log('PostgreSQL server running on port ' + PORT);
+  console.log('Health check: /health');
+  console.log('Test endpoint: /api/test');
+});
