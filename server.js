@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
@@ -21,20 +21,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Simple file-based storage
-const DATA_FILE = './data.json';
+// In-memory storage for simplicity
+let data = { users: {}, activities: [] };
 
-const readData = () => {
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  } catch {
-    return { users: {}, activities: [] };
-  }
-};
-
-const writeData = (data) => {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-};
+const readData = () => data;
+const writeData = (newData) => { data = newData; };
 
 // API Routes
 app.post('/api/register', (req, res) => {
@@ -106,10 +97,25 @@ app.get('*', (req, res) => {
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
-    res.status(404).json({ error: 'Frontend not built. Run npm run build first.' });
+    // Fallback HTML if dist doesn't exist
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>AI Study Companion</title></head>
+        <body>
+          <div id="root">
+            <h1>AI Study Companion</h1>
+            <p>Server is running but frontend build not found.</p>
+            <p>API endpoints are available at /api/*</p>
+          </div>
+        </body>
+      </html>
+    `);
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log('Environment:', process.env.NODE_ENV);
+  console.log('Dist exists:', fs.existsSync(path.join(__dirname, 'dist')));
 });
