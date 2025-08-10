@@ -49,6 +49,7 @@ function App() {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('quiz');
+  const [selectedAnswers, setSelectedAnswers] = useState({});
   
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -137,8 +138,25 @@ function App() {
           content.map((item, i) => 
             React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
               tab === 'quiz' ? [
-                React.createElement('p', {className: 'font-bold mb-2'}, item.question),
-                React.createElement('ul', {className: 'space-y-1'}, item.options?.map((opt, j) => React.createElement('li', {key: j, className: 'p-2 bg-white rounded cursor-pointer hover:bg-purple-100'}, opt)))
+                React.createElement('p', {className: 'font-bold mb-4 text-lg'}, item.question),
+                React.createElement('ul', {className: 'space-y-2'}, item.options?.map((opt, j) => {
+                  const selectedOption = selectedAnswers[i];
+                  let className = 'p-3 rounded-lg cursor-pointer transition-colors ';
+                  if (!selectedOption) {
+                    className += 'bg-white hover:bg-purple-100';
+                  } else if (opt === item.answer) {
+                    className += 'bg-green-500 text-white';
+                  } else if (opt === selectedOption && opt !== item.answer) {
+                    className += 'bg-red-500 text-white';
+                  } else {
+                    className += 'bg-white';
+                  }
+                  return React.createElement('li', {
+                    key: j, 
+                    className: className,
+                    onClick: () => setSelectedAnswers(prev => ({...prev, [i]: opt}))
+                  }, opt);
+                }))
               ] : tab === 'flashcards' ? [
                 React.createElement('p', {className: 'font-bold'}, item.term),
                 React.createElement('p', {className: 'text-gray-600'}, item.definition)
