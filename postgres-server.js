@@ -9,31 +9,14 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// Database connection with fallback
-let pool;
-let usePostgres = false;
-
-try {
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-  usePostgres = !!process.env.DATABASE_URL;
-} catch (err) {
-  console.log('PostgreSQL not available, using in-memory storage');
-  usePostgres = false;
-}
-
-// Fallback in-memory storage
-let memoryData = { users: {}, quizSessions: [], activities: [] };
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres@localhost:5432/ai_study_companion',
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 // Initialize database tables
 const initDB = async () => {
-  if (!usePostgres) {
-    console.log('Using in-memory storage');
-    return;
-  }
-  
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
@@ -71,8 +54,6 @@ const initDB = async () => {
     console.log('PostgreSQL database initialized');
   } catch (err) {
     console.error('Database initialization error:', err);
-    usePostgres = false;
-    console.log('Falling back to in-memory storage');
   }
 };
 
@@ -83,30 +64,11 @@ initDB();
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    
-    if (usePostgres) {
-      const result = await pool.query(
-        'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
-        [username, email, password]
-      );
-      res.json({ success: true, user: result.rows[0] });
-    } else {
-      // In-memory storage
-      const existingUser = Object.values(memoryData.users).find(u => u.username === username);
-      if (existingUser) {
-        return res.status(400).json({ success: false, error: 'Username already exists' });
-      }
-      const userId = Date.now().toString();
-      const user = {
-        id: userId,
-        username,
-        email,
-        password,
-        created_at: new Date().toISOString()
-      };
-      memoryData.users[userId] = user;
-      res.json({ success: true, user });
-    }
+    const result = await pool.query(
+      'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
+      [username, email, password]
+    );
+    res.json({ success: true, user: result.rows[0] });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message.includes('duplicate') ? 'Username already exists' : 'Registration failed' });
   }
@@ -115,24 +77,13 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    if (usePostgres) {
-      const result = await pool.query('SELECT * FROM users WHERE username = $1 AND password = $2', [username, password]);
-      if (result.rows.length > 0) {
-        const user = result.rows[0];
-        await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
-        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
-      } else {
-        res.status(401).json({ success: false, error: 'Invalid credentials' });
-      }
+    const result = await pool.query('SELECT * FROM users WHERE username = $1 AND password = $2', [username, password]);
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+      res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
     } else {
-      // In-memory storage
-      const user = Object.values(memoryData.users).find(u => u.username === username && u.password === password);
-      if (user) {
-        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
-      } else {
-        res.status(401).json({ success: false, error: 'Invalid credentials' });
-      }
+      res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
   } catch (err) {
     res.status(500).json({ success: false, error: 'Login failed' });
@@ -142,24 +93,10 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/quiz-result', async (req, res) => {
   try {
     const { userId, topic, totalQuestions, correctAnswers, scorePercentage } = req.body;
-    
-    if (usePostgres) {
-      await pool.query(
-        'INSERT INTO quiz_sessions (user_id, topic, total_questions, correct_answers, score_percentage) VALUES ($1, $2, $3, $4, $5)',
-        [userId, topic, totalQuestions, correctAnswers, scorePercentage]
-      );
-    } else {
-      // In-memory storage
-      memoryData.quizSessions.push({
-        id: Date.now().toString(),
-        user_id: userId,
-        topic,
-        total_questions: totalQuestions,
-        correct_answers: correctAnswers,
-        score_percentage: scorePercentage,
-        created_at: new Date().toISOString()
-      });
-    }
+    await pool.query(
+      'INSERT INTO quiz_sessions (user_id, topic, total_questions, correct_answers, score_percentage) VALUES ($1, $2, $3, $4, $5)',
+      [userId, topic, totalQuestions, correctAnswers, scorePercentage]
+    );
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to save quiz result' });
@@ -182,22 +119,10 @@ app.get('/api/quiz-history/:userId', async (req, res) => {
 app.post('/api/activity', async (req, res) => {
   try {
     const { userId, action, data } = req.body;
-    
-    if (usePostgres) {
-      await pool.query(
-        'INSERT INTO activities (user_id, action, data) VALUES ($1, $2, $3)',
-        [userId, action, JSON.stringify(data)]
-      );
-    } else {
-      // In-memory storage
-      memoryData.activities.push({
-        id: Date.now().toString(),
-        user_id: userId,
-        action,
-        data,
-        timestamp: new Date().toISOString()
-      });
-    }
+    await pool.query(
+      'INSERT INTO activities (user_id, action, data) VALUES ($1, $2, $3)',
+      [userId, action, JSON.stringify(data)]
+    );
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to log activity' });
