@@ -9,15 +9,32 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection
+// PostgreSQL connection with better error handling
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://postgres@localhost:5432/ai_study_companion',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Test connection
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('PostgreSQL connection error:', err);
+});
+
+// In-memory fallback storage
+let memoryData = { users: {}, quizSessions: [], activities: [] };
+let usePostgres = false;
+
 // Initialize database tables
 const initDB = async () => {
   try {
+    // Test connection first
+    await pool.query('SELECT NOW()');
+    console.log('PostgreSQL connection successful');
+    
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -51,9 +68,12 @@ const initDB = async () => {
       )
     `);
 
-    console.log('PostgreSQL database initialized');
+    usePostgres = true;
+    console.log('PostgreSQL database initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err);
+    console.log('Using in-memory storage as fallback');
+    usePostgres = false;
   }
 };
 
@@ -64,12 +84,35 @@ initDB();
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    const result = await pool.query(
-      'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
-      [username, email, password]
-    );
-    res.json({ success: true, user: result.rows[0] });
+    console.log('Registration attempt:', { username, email, usePostgres });
+    
+    if (usePostgres) {
+      const result = await pool.query(
+        'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
+        [username, email, password]
+      );
+      console.log('User registered in PostgreSQL:', result.rows[0]);
+      res.json({ success: true, user: result.rows[0] });
+    } else {
+      // Fallback to memory
+      const existingUser = Object.values(memoryData.users).find(u => u.username === username);
+      if (existingUser) {
+        return res.status(400).json({ success: false, error: 'Username already exists' });
+      }
+      const userId = Date.now().toString();
+      const user = {
+        id: userId,
+        username,
+        email,
+        password,
+        created_at: new Date().toISOString()
+      };
+      memoryData.users[userId] = user;
+      console.log('User registered in memory:', user);
+      res.json({ success: true, user });
+    }
   } catch (err) {
+    console.error('Registration error:', err);
     res.status(400).json({ success: false, error: err.message.includes('duplicate') ? 'Username already exists' : 'Registration failed' });
   }
 });
@@ -77,15 +120,30 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const result = await pool.query('SELECT * FROM users WHERE username = $1 AND password = $2', [username, password]);
-    if (result.rows.length > 0) {
-      const user = result.rows[0];
-      await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
-      res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
+    console.log('Login attempt:', { username, usePostgres });
+    
+    if (usePostgres) {
+      const result = await pool.query('SELECT * FROM users WHERE username = $1 AND password = $2', [username, password]);
+      if (result.rows.length > 0) {
+        const user = result.rows[0];
+        await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+        console.log('User logged in via PostgreSQL:', user.username);
+        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
+      } else {
+        res.status(401).json({ success: false, error: 'Invalid credentials' });
+      }
     } else {
-      res.status(401).json({ success: false, error: 'Invalid credentials' });
+      // Fallback to memory
+      const user = Object.values(memoryData.users).find(u => u.username === username && u.password === password);
+      if (user) {
+        console.log('User logged in via memory:', user.username);
+        res.json({ success: true, user: { id: user.id, username: user.username, email: user.email } });
+      } else {
+        res.status(401).json({ success: false, error: 'Invalid credentials' });
+      }
     }
   } catch (err) {
+    console.error('Login error:', err);
     res.status(500).json({ success: false, error: 'Login failed' });
   }
 });
@@ -93,12 +151,30 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/quiz-result', async (req, res) => {
   try {
     const { userId, topic, totalQuestions, correctAnswers, scorePercentage } = req.body;
-    await pool.query(
-      'INSERT INTO quiz_sessions (user_id, topic, total_questions, correct_answers, score_percentage) VALUES ($1, $2, $3, $4, $5)',
-      [userId, topic, totalQuestions, correctAnswers, scorePercentage]
-    );
+    console.log('Saving quiz result:', { userId, topic, totalQuestions, correctAnswers, scorePercentage, usePostgres });
+    
+    if (usePostgres) {
+      await pool.query(
+        'INSERT INTO quiz_sessions (user_id, topic, total_questions, correct_answers, score_percentage) VALUES ($1, $2, $3, $4, $5)',
+        [userId, topic, totalQuestions, correctAnswers, scorePercentage]
+      );
+      console.log('Quiz result saved to PostgreSQL');
+    } else {
+      // Fallback to memory
+      memoryData.quizSessions.push({
+        id: Date.now().toString(),
+        user_id: userId,
+        topic,
+        total_questions: totalQuestions,
+        correct_answers: correctAnswers,
+        score_percentage: scorePercentage,
+        created_at: new Date().toISOString()
+      });
+      console.log('Quiz result saved to memory');
+    }
     res.json({ success: true });
   } catch (err) {
+    console.error('Quiz result save error:', err);
     res.status(500).json({ success: false, error: 'Failed to save quiz result' });
   }
 });
