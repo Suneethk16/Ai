@@ -73,9 +73,10 @@ function App() {
   const generate = async () => {
     if (!topic) return;
     setLoading(true);
+    setSelectedAnswers({});
     try {
       const prompt = tab === 'quiz' ? 
-        'Generate 5 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
+        'Generate 10 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
         tab === 'flashcards' ?
         'Generate 8 flashcards about "' + topic + '" as JSON array with term, definition' :
         'Generate mind map for "' + topic + '" as JSON array with concept, related_concepts';
@@ -89,6 +90,7 @@ function App() {
       const text = result.candidates[0].content.parts[0].text;
       const json = JSON.parse(text.replace(/\`\`\`json|\\n|\`\`\`/g, ''));
       setContent(json);
+      setSelectedAnswers({});
     } catch (err) {
       console.error(err);
     }
@@ -135,35 +137,55 @@ function App() {
           )
         ),
         content && React.createElement('div', {className: 'space-y-4'},
-          content.map((item, i) => 
+          tab === 'quiz' && (() => {
+            const totalQuestions = content.length;
+            const answeredQuestions = Object.keys(selectedAnswers).length;
+            const correctAnswers = Object.keys(selectedAnswers).filter(i => selectedAnswers[i] === content[i].answer).length;
+            const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+            
+            return [
+              React.createElement('div', {key: 'score', className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-xl mb-6 text-center'},
+                React.createElement('h3', {className: 'text-2xl font-bold mb-2'}, 'Quiz Score'),
+                React.createElement('div', {className: 'flex justify-center space-x-8 text-lg'},
+                  React.createElement('div', null, 'Score: ' + correctAnswers + '/' + totalQuestions + ' (' + score + '%)'),
+                  React.createElement('div', null, 'Answered: ' + answeredQuestions + '/' + totalQuestions)
+                )
+              ),
+              ...content.map((item, i) => 
+                React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
+                  React.createElement('p', {className: 'font-bold mb-4 text-lg'}, 'Q' + (i + 1) + '. ' + item.question),
+                  React.createElement('ul', {className: 'space-y-2'}, item.options?.map((opt, j) => {
+                    const selectedOption = selectedAnswers[i];
+                    let className = 'p-3 rounded-lg cursor-pointer transition-colors ';
+                    if (!selectedOption) {
+                      className += 'bg-white hover:bg-purple-100';
+                    } else if (opt === item.answer) {
+                      className += 'bg-green-500 text-white';
+                    } else if (opt === selectedOption && opt !== item.answer) {
+                      className += 'bg-red-500 text-white';
+                    } else {
+                      className += 'bg-white';
+                    }
+                    return React.createElement('li', {
+                      key: j, 
+                      className: className,
+                      onClick: () => setSelectedAnswers(prev => ({...prev, [i]: opt}))
+                    }, opt);
+                  }))
+                )
+              )
+            ];
+          })(),
+          tab === 'flashcards' && content.map((item, i) => 
             React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
-              tab === 'quiz' ? [
-                React.createElement('p', {className: 'font-bold mb-4 text-lg'}, item.question),
-                React.createElement('ul', {className: 'space-y-2'}, item.options?.map((opt, j) => {
-                  const selectedOption = selectedAnswers[i];
-                  let className = 'p-3 rounded-lg cursor-pointer transition-colors ';
-                  if (!selectedOption) {
-                    className += 'bg-white hover:bg-purple-100';
-                  } else if (opt === item.answer) {
-                    className += 'bg-green-500 text-white';
-                  } else if (opt === selectedOption && opt !== item.answer) {
-                    className += 'bg-red-500 text-white';
-                  } else {
-                    className += 'bg-white';
-                  }
-                  return React.createElement('li', {
-                    key: j, 
-                    className: className,
-                    onClick: () => setSelectedAnswers(prev => ({...prev, [i]: opt}))
-                  }, opt);
-                }))
-              ] : tab === 'flashcards' ? [
-                React.createElement('p', {className: 'font-bold'}, item.term),
-                React.createElement('p', {className: 'text-gray-600'}, item.definition)
-              ] : [
-                React.createElement('p', {className: 'font-bold'}, item.concept),
-                React.createElement('ul', {className: 'mt-2 space-y-1'}, item.related_concepts?.map((rel, j) => React.createElement('li', {key: j, className: 'text-sm text-gray-600'}, '• ' + rel)))
-              ]
+              React.createElement('p', {className: 'font-bold'}, item.term),
+              React.createElement('p', {className: 'text-gray-600'}, item.definition)
+            )
+          ),
+          tab === 'mindmap' && content.map((item, i) => 
+            React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
+              React.createElement('p', {className: 'font-bold'}, item.concept),
+              React.createElement('ul', {className: 'mt-2 space-y-1'}, item.related_concepts?.map((rel, j) => React.createElement('li', {key: j, className: 'text-sm text-gray-600'}, '• ' + rel)))
             )
           )
         )
