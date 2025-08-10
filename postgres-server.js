@@ -11,9 +11,15 @@ app.use(express.json());
 
 // PostgreSQL connection with better error handling
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres@localhost:5432/ai_study_companion',
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:@localhost:5432/ai_study_companion',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
+// For local development, ensure database exists
+if (!process.env.DATABASE_URL) {
+  console.log('Using local PostgreSQL: postgresql://postgres:@localhost:5432/ai_study_companion');
+  console.log('Make sure to create database: CREATE DATABASE ai_study_companion;');
+}
 
 // Test connection
 pool.on('connect', () => {
@@ -207,11 +213,334 @@ app.post('/api/activity', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username, email, created_at, last_login FROM users');
-    res.json({ success: true, users: result.rows });
+    if (usePostgres) {
+      const result = await pool.query('SELECT id, username, email, created_at, last_login FROM users');
+      res.json({ success: true, users: result.rows, storage: 'postgresql' });
+    } else {
+      res.json({ success: true, users: Object.values(memoryData.users), storage: 'memory' });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to get users' });
   }
+});
+
+// Debug endpoint to check all data
+app.get('/api/debug', async (req, res) => {
+  try {
+    if (usePostgres) {
+      const users = await pool.query('SELECT id, username, email, created_at, last_login FROM users');
+      const quizzes = await pool.query('SELECT q.*, u.username FROM quiz_sessions q LEFT JOIN users u ON q.user_id = u.id ORDER BY q.created_at DESC');
+      const activities = await pool.query('SELECT a.*, u.username FROM activities a LEFT JOIN users u ON a.user_id = u.id ORDER BY a.timestamp DESC');
+      
+      res.json({
+        success: true,
+        storage: 'postgresql',
+        data: {
+          users: users.rows,
+          quizzes: quizzes.rows,
+          activities: activities.rows
+        },
+        counts: {
+          users: users.rows.length,
+          quizzes: quizzes.rows.length,
+          activities: activities.rows.length
+        }
+      });
+    } else {
+      res.json({
+        success: true,
+        storage: 'memory',
+        data: memoryData,
+        counts: {
+          users: Object.keys(memoryData.users).length,
+          quizzes: memoryData.quizSessions.length,
+          activities: memoryData.activities.length
+        }
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete endpoints
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (usePostgres) {
+      await pool.query('DELETE FROM activities WHERE user_id = $1', [id]);
+      await pool.query('DELETE FROM quiz_sessions WHERE user_id = $1', [id]);
+      await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    } else {
+      delete memoryData.users[id];
+      memoryData.activities = memoryData.activities.filter(a => a.user_id !== id);
+      memoryData.quizSessions = memoryData.quizSessions.filter(q => q.user_id !== id);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to delete user' });
+  }
+});
+
+app.delete('/api/quiz-sessions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (usePostgres) {
+      await pool.query('DELETE FROM quiz_sessions WHERE id = $1', [id]);
+    } else {
+      memoryData.quizSessions = memoryData.quizSessions.filter(q => q.id !== id);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to delete quiz session' });
+  }
+});
+
+app.delete('/api/activities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (usePostgres) {
+      await pool.query('DELETE FROM activities WHERE id = $1', [id]);
+    } else {
+      memoryData.activities = memoryData.activities.filter(a => a.id !== id);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to delete activity' });
+  }
+});
+
+app.delete('/api/clear-all', async (req, res) => {
+  try {
+    if (usePostgres) {
+      await pool.query('DELETE FROM activities');
+      await pool.query('DELETE FROM quiz_sessions');
+      await pool.query('DELETE FROM users');
+    } else {
+      memoryData = { users: {}, quizSessions: [], activities: [] };
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to clear all data' });
+  }
+});
+
+// Admin page route
+app.get('/admin', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html><head><title>Database Admin</title><script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://cdn.tailwindcss.com"></script></head>
+<body><div id="root"></div><script>
+const {useState, useEffect} = React;
+
+function AdminPanel() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('users');
+  
+  const loadData = async () => {
+    try {
+      const res = await fetch('/api/debug');
+      const result = await res.json();
+      setData(result);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+    }
+    setLoading(false);
+  };
+  
+  const deleteItem = async (type, id) => {
+    if (!confirm('Are you sure you want to delete this item?')) return;
+    try {
+      await fetch('/api/' + type + '/' + id, { method: 'DELETE' });
+      loadData();
+    } catch (err) {
+      alert('Failed to delete item');
+    }
+  };
+  
+  const clearAll = async () => {
+    if (!confirm('Are you sure you want to delete ALL data? This cannot be undone!')) return;
+    try {
+      await fetch('/api/clear-all', { method: 'DELETE' });
+      loadData();
+    } catch (err) {
+      alert('Failed to clear data');
+    }
+  };
+  
+  useEffect(() => {
+    loadData();
+  }, []);
+  
+  if (loading) {
+    return React.createElement('div', {className: 'min-h-screen bg-gray-100 flex items-center justify-center'},
+      React.createElement('div', {className: 'text-center'},
+        React.createElement('div', {className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4'}),
+        React.createElement('p', {className: 'text-gray-600'}, 'Loading database data...')
+      )
+    );
+  }
+  
+  return React.createElement('div', {className: 'min-h-screen bg-gray-100 p-6'},
+    React.createElement('div', {className: 'max-w-7xl mx-auto'},
+      React.createElement('header', {className: 'mb-8'},
+        React.createElement('h1', {className: 'text-4xl font-bold text-gray-800 mb-2'}, 'Database Admin Panel'),
+        React.createElement('div', {className: 'flex justify-between items-center'},
+          React.createElement('p', {className: 'text-gray-600'}, 'Storage: ' + (data?.storage || 'unknown')),
+          React.createElement('div', {className: 'space-x-4'},
+            React.createElement('button', {onClick: loadData, className: 'px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'}, 'Refresh'),
+            React.createElement('button', {onClick: clearAll, className: 'px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600'}, 'Clear All Data'),
+            React.createElement('a', {href: '/', className: 'px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600'}, 'Back to App')
+          )
+        )
+      ),
+      
+      // Stats
+      React.createElement('div', {className: 'grid grid-cols-3 gap-6 mb-8'},
+        React.createElement('div', {className: 'bg-white p-6 rounded-lg shadow'},
+          React.createElement('h3', {className: 'text-lg font-semibold text-gray-700'}, 'Users'),
+          React.createElement('p', {className: 'text-3xl font-bold text-blue-600'}, data?.counts?.users || 0)
+        ),
+        React.createElement('div', {className: 'bg-white p-6 rounded-lg shadow'},
+          React.createElement('h3', {className: 'text-lg font-semibold text-gray-700'}, 'Quiz Sessions'),
+          React.createElement('p', {className: 'text-3xl font-bold text-green-600'}, data?.counts?.quizzes || 0)
+        ),
+        React.createElement('div', {className: 'bg-white p-6 rounded-lg shadow'},
+          React.createElement('h3', {className: 'text-lg font-semibold text-gray-700'}, 'Activities'),
+          React.createElement('p', {className: 'text-3xl font-bold text-purple-600'}, data?.counts?.activities || 0)
+        )
+      ),
+      
+      // Tabs
+      React.createElement('div', {className: 'mb-6'},
+        React.createElement('div', {className: 'flex space-x-1 bg-white rounded-lg p-1 shadow'},
+          ['users', 'quiz-sessions', 'activities'].map(tab =>
+            React.createElement('button', {
+              key: tab,
+              onClick: () => setActiveTab(tab),
+              className: 'px-6 py-2 rounded-md font-medium ' + (activeTab === tab ? 'bg-purple-500 text-white' : 'text-gray-600 hover:bg-gray-100')
+            }, tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' '))
+          )
+        )
+      ),
+      
+      // Content
+      React.createElement('div', {className: 'bg-white rounded-lg shadow overflow-hidden'},
+        activeTab === 'users' && React.createElement('div', null,
+          React.createElement('div', {className: 'px-6 py-4 border-b'},
+            React.createElement('h2', {className: 'text-xl font-semibold'}, 'Users (' + (data?.data?.users?.length || 0) + ')')
+          ),
+          React.createElement('div', {className: 'overflow-x-auto'},
+            React.createElement('table', {className: 'w-full'},
+              React.createElement('thead', {className: 'bg-gray-50'},
+                React.createElement('tr', null,
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'ID'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Username'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Email'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Created'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Actions')
+                )
+              ),
+              React.createElement('tbody', {className: 'divide-y divide-gray-200'},
+                data?.data?.users?.map(user =>
+                  React.createElement('tr', {key: user.id},
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, user.id),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm font-medium text-gray-900'}, user.username),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, user.email),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, new Date(user.created_at).toLocaleDateString()),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm'},
+                      React.createElement('button', {
+                        onClick: () => deleteItem('users', user.id),
+                        className: 'text-red-600 hover:text-red-900'
+                      }, 'Delete')
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        
+        activeTab === 'quiz-sessions' && React.createElement('div', null,
+          React.createElement('div', {className: 'px-6 py-4 border-b'},
+            React.createElement('h2', {className: 'text-xl font-semibold'}, 'Quiz Sessions (' + (data?.data?.quizzes?.length || 0) + ')')
+          ),
+          React.createElement('div', {className: 'overflow-x-auto'},
+            React.createElement('table', {className: 'w-full'},
+              React.createElement('thead', {className: 'bg-gray-50'},
+                React.createElement('tr', null,
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'ID'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'User'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Topic'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Score'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Date'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Actions')
+                )
+              ),
+              React.createElement('tbody', {className: 'divide-y divide-gray-200'},
+                data?.data?.quizzes?.map(quiz =>
+                  React.createElement('tr', {key: quiz.id},
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, quiz.id),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, quiz.username || 'Unknown'),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, quiz.topic),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, quiz.correct_answers + '/' + quiz.total_questions + ' (' + quiz.score_percentage + '%)'),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, new Date(quiz.created_at).toLocaleDateString()),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm'},
+                      React.createElement('button', {
+                        onClick: () => deleteItem('quiz-sessions', quiz.id),
+                        className: 'text-red-600 hover:text-red-900'
+                      }, 'Delete')
+                    )
+                  )
+                )
+              )
+            )
+          )
+        ),
+        
+        activeTab === 'activities' && React.createElement('div', null,
+          React.createElement('div', {className: 'px-6 py-4 border-b'},
+            React.createElement('h2', {className: 'text-xl font-semibold'}, 'Activities (' + (data?.data?.activities?.length || 0) + ')')
+          ),
+          React.createElement('div', {className: 'overflow-x-auto'},
+            React.createElement('table', {className: 'w-full'},
+              React.createElement('thead', {className: 'bg-gray-50'},
+                React.createElement('tr', null,
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'ID'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'User'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Action'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Data'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Time'),
+                  React.createElement('th', {className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'}, 'Actions')
+                )
+              ),
+              React.createElement('tbody', {className: 'divide-y divide-gray-200'},
+                data?.data?.activities?.map(activity =>
+                  React.createElement('tr', {key: activity.id},
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, activity.id),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, activity.username || 'Unknown'),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, activity.action),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900 max-w-xs truncate'}, JSON.stringify(activity.data)),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm text-gray-900'}, new Date(activity.timestamp).toLocaleString()),
+                    React.createElement('td', {className: 'px-6 py-4 text-sm'},
+                      React.createElement('button', {
+                        onClick: () => deleteItem('activities', activity.id),
+                        className: 'text-red-600 hover:text-red-900'
+                      }, 'Delete')
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+ReactDOM.render(React.createElement(AdminPanel), document.getElementById('root'));
+</script></body></html>`);
 });
 
 app.get('*', (req, res) => {
