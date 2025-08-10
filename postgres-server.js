@@ -47,8 +47,19 @@ const initDB = async () => {
         username VARCHAR(50) UNIQUE NOT NULL,
         email VARCHAR(100) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
+        email_verified BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         last_login TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_otps (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(100) NOT NULL,
+        otp VARCHAR(6) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -87,15 +98,100 @@ const initDB = async () => {
 initDB();
 
 // API Routes
-app.post('/api/register', async (req, res) => {
+// Generate OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Send OTP (mock email service)
+const sendOTP = async (email, otp) => {
+  // In production, use a real email service like SendGrid, Nodemailer, etc.
+  console.log(`📧 OTP for ${email}: ${otp}`);
+  console.log(`Mock email sent: Your verification code is ${otp}`);
+  return true;
+};
+
+app.post('/api/send-otp', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-    console.log('Registration attempt:', { username, email, usePostgres });
+    const { email } = req.body;
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    
+    if (usePostgres) {
+      // Delete old OTPs for this email
+      await pool.query('DELETE FROM email_otps WHERE email = $1', [email]);
+      // Insert new OTP
+      await pool.query(
+        'INSERT INTO email_otps (email, otp, expires_at) VALUES ($1, $2, $3)',
+        [email, otp, expiresAt]
+      );
+    } else {
+      // Memory storage
+      if (!memoryData.emailOtps) memoryData.emailOtps = [];
+      memoryData.emailOtps = memoryData.emailOtps.filter(o => o.email !== email);
+      memoryData.emailOtps.push({
+        id: Date.now().toString(),
+        email,
+        otp,
+        expires_at: expiresAt.toISOString(),
+        created_at: new Date().toISOString()
+      });
+    }
+    
+    await sendOTP(email, otp);
+    res.json({ success: true, message: 'OTP sent to email' });
+  } catch (err) {
+    console.error('Send OTP error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send OTP' });
+  }
+});
+
+app.post('/api/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
     
     if (usePostgres) {
       const result = await pool.query(
-        'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
-        [username, email, password]
+        'SELECT * FROM email_otps WHERE email = $1 AND otp = $2 AND expires_at > NOW()',
+        [email, otp]
+      );
+      
+      if (result.rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+      }
+      
+      // Delete used OTP
+      await pool.query('DELETE FROM email_otps WHERE email = $1', [email]);
+    } else {
+      // Memory storage
+      const otpRecord = memoryData.emailOtps?.find(o => 
+        o.email === email && o.otp === otp && new Date(o.expires_at) > new Date()
+      );
+      
+      if (!otpRecord) {
+        return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+      }
+      
+      // Remove used OTP
+      memoryData.emailOtps = memoryData.emailOtps.filter(o => o.email !== email);
+    }
+    
+    res.json({ success: true, message: 'Email verified successfully' });
+  } catch (err) {
+    console.error('Verify OTP error:', err);
+    res.status(500).json({ success: false, error: 'Failed to verify OTP' });
+  }
+});
+
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, email, password, emailVerified } = req.body;
+    console.log('Registration attempt:', { username, email, emailVerified, usePostgres });
+    
+    if (usePostgres) {
+      const result = await pool.query(
+        'INSERT INTO users (username, email, password, email_verified) VALUES ($1, $2, $3, $4) RETURNING id, username, email, email_verified, created_at',
+        [username, email, password, emailVerified || false]
       );
       console.log('User registered in PostgreSQL:', result.rows[0]);
       res.json({ success: true, user: result.rows[0] });
@@ -111,9 +207,11 @@ app.post('/api/register', async (req, res) => {
         username,
         email,
         password,
+        email_verified: emailVerified || false,
         created_at: new Date().toISOString()
       };
       memoryData.users[userId] = user;
+      if (!memoryData.emailOtps) memoryData.emailOtps = [];
       console.log('User registered in memory:', user);
       res.json({ success: true, user });
     }
@@ -551,20 +649,76 @@ const {useState} = React;
 function App() {
   const [user, setUser] = useState(null);
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({username:'',email:'',password:'',confirmPassword:''});
+  const [form, setForm] = useState({username:'',email:'',password:'',confirmPassword:'',otp:''});
   const [error, setError] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [topic, setTopic] = useState('');
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('quiz');
   const [selectedAnswers, setSelectedAnswers] = useState({});
   
+  const sendOTP = async () => {
+    if (!form.email) {
+      setError('Please enter email address');
+      return;
+    }
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: form.email})
+      });
+      const result = await res.json();
+      if (result.success) {
+        setOtpSent(true);
+        setError('');
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError('Failed to send OTP');
+    }
+  };
+  
+  const verifyOTP = async () => {
+    if (!form.otp) {
+      setError('Please enter OTP');
+      return;
+    }
+    try {
+      const res = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: form.email, otp: form.otp})
+      });
+      const result = await res.json();
+      if (result.success) {
+        setEmailVerified(true);
+        setError('');
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError('Failed to verify OTP');
+    }
+  };
+  
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
+    
+    if (mode === 'signup' && !emailVerified) {
+      setError('Please verify your email first');
+      return;
+    }
+    
     try {
       const url = mode === 'login' ? '/api/login' : '/api/register';
-      const body = mode === 'login' ? {username: form.username, password: form.password} : form;
+      const body = mode === 'login' ? 
+        {username: form.username, password: form.password} : 
+        {username: form.username, email: form.email, password: form.password, emailVerified: emailVerified};
       const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
       const result = await res.json();
       if (result.success) {
@@ -640,7 +794,17 @@ function App() {
         React.createElement('h1', {className: 'text-3xl font-bold text-center mb-8'}, mode === 'login' ? 'Welcome Back' : 'Create Account'),
         React.createElement('form', {onSubmit: handleAuth, className: 'space-y-4'},
           React.createElement('input', {type: 'text', placeholder: 'Username', className: 'w-full p-3 border rounded-xl', value: form.username, onChange: e => setForm({...form, username: e.target.value})}),
-          mode === 'signup' && React.createElement('input', {type: 'email', placeholder: 'Email', className: 'w-full p-3 border rounded-xl', value: form.email, onChange: e => setForm({...form, email: e.target.value})}),
+          mode === 'signup' && React.createElement('div', {className: 'space-y-2'},
+            React.createElement('div', {className: 'flex gap-2'},
+              React.createElement('input', {type: 'email', placeholder: 'Email', className: 'flex-1 p-3 border rounded-xl', value: form.email, onChange: e => setForm({...form, email: e.target.value})}),
+              React.createElement('button', {type: 'button', onClick: sendOTP, disabled: otpSent, className: 'px-4 py-3 bg-blue-500 text-white rounded-xl text-sm ' + (otpSent ? 'opacity-50' : 'hover:bg-blue-600')}, otpSent ? 'Sent' : 'Send OTP')
+            ),
+            otpSent && React.createElement('div', {className: 'flex gap-2'},
+              React.createElement('input', {type: 'text', placeholder: 'Enter OTP', className: 'flex-1 p-3 border rounded-xl', value: form.otp, onChange: e => setForm({...form, otp: e.target.value})}),
+              React.createElement('button', {type: 'button', onClick: verifyOTP, disabled: emailVerified, className: 'px-4 py-3 bg-green-500 text-white rounded-xl text-sm ' + (emailVerified ? 'opacity-50' : 'hover:bg-green-600')}, emailVerified ? 'Verified' : 'Verify')
+            ),
+            emailVerified && React.createElement('p', {className: 'text-green-500 text-sm'}, '✓ Email verified successfully')
+          ),
           React.createElement('input', {type: 'password', placeholder: 'Password', className: 'w-full p-3 border rounded-xl', value: form.password, onChange: e => setForm({...form, password: e.target.value})}),
           mode === 'signup' && React.createElement('input', {type: 'password', placeholder: 'Confirm Password', className: 'w-full p-3 border rounded-xl', value: form.confirmPassword, onChange: e => setForm({...form, confirmPassword: e.target.value})}),
           error && React.createElement('p', {className: 'text-red-500 text-center'}, error),
