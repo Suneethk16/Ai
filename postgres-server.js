@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
+import nodemailer from 'nodemailer';
 
 const { Pool } = pg;
 const app = express();
@@ -103,12 +104,61 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP (mock email service)
+// Email transporter setup
+const createTransporter = () => {
+  return nodemailer.createTransporter({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER || 'your-email@gmail.com',
+      pass: process.env.EMAIL_PASS || 'your-app-password'
+    }
+  });
+};
+
+// Send OTP via email
 const sendOTP = async (email, otp) => {
-  // In production, use a real email service like SendGrid, Nodemailer, etc.
-  console.log(`📧 OTP for ${email}: ${otp}`);
-  console.log(`Mock email sent: Your verification code is ${otp}`);
-  return true;
+  try {
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'AI Study Companion <your-email@gmail.com>',
+      to: email,
+      subject: 'Email Verification - AI Study Companion',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">🎓 AI Study Companion</h1>
+            <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Email Verification</p>
+          </div>
+          
+          <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; margin-top: 0;">Verify Your Email Address</h2>
+            <p style="color: #666; line-height: 1.6;">Thank you for signing up! Please use the verification code below to complete your registration:</p>
+            
+            <div style="background: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
+              <h1 style="color: #667eea; font-size: 36px; margin: 0; letter-spacing: 8px; font-family: 'Courier New', monospace;">${otp}</h1>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">This code will expire in <strong>10 minutes</strong>. If you didn't request this verification, please ignore this email.</p>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+              <p style="color: #999; font-size: 14px; margin: 0;">AI Study Companion - Your Personal Learning Assistant</p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`📧 OTP sent to ${email}: ${otp}`);
+    console.log('Email sent:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Email sending failed:', error);
+    // Fallback to console log for development
+    console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
+    return false;
+  }
 };
 
 app.post('/api/send-otp', async (req, res) => {
