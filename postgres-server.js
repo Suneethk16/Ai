@@ -238,18 +238,37 @@ app.post('/api/register', async (req, res) => {
     const { username, email, password, emailVerified } = req.body;
     console.log('Registration attempt:', { username, email, emailVerified, usePostgres });
     
+    // Basic validation
+    if (!username || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    
+    if (username.length < 3) {
+      return res.status(400).json({ success: false, error: 'Username must be at least 3 characters' });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 6 characters' });
+    }
+    
     if (usePostgres) {
+      // Check if user already exists
+      const existingUser = await pool.query('SELECT id FROM users WHERE username = $1 OR email = $2', [username, email]);
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({ success: false, error: 'Username or email already exists' });
+      }
+      
       const result = await pool.query(
         'INSERT INTO users (username, email, password, email_verified) VALUES ($1, $2, $3, $4) RETURNING id, username, email, email_verified, created_at',
         [username, email, password, emailVerified || false]
       );
       console.log('User registered in PostgreSQL:', result.rows[0]);
-      res.json({ success: true, user: result.rows[0] });
+      res.json({ success: true, user: result.rows[0], message: 'Registration successful!' });
     } else {
       // Fallback to memory
-      const existingUser = Object.values(memoryData.users).find(u => u.username === username);
+      const existingUser = Object.values(memoryData.users).find(u => u.username === username || u.email === email);
       if (existingUser) {
-        return res.status(400).json({ success: false, error: 'Username already exists' });
+        return res.status(400).json({ success: false, error: 'Username or email already exists' });
       }
       const userId = Date.now().toString();
       const user = {
@@ -263,11 +282,11 @@ app.post('/api/register', async (req, res) => {
       memoryData.users[userId] = user;
       if (!memoryData.emailOtps) memoryData.emailOtps = [];
       console.log('User registered in memory:', user);
-      res.json({ success: true, user });
+      res.json({ success: true, user, message: 'Registration successful!' });
     }
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(400).json({ success: false, error: err.message.includes('duplicate') ? 'Username already exists' : 'Registration failed' });
+    res.status(500).json({ success: false, error: 'Registration failed. Please try again.' });
   }
 });
 
@@ -759,9 +778,24 @@ function App() {
     e.preventDefault();
     setError('');
     
-    if (mode === 'signup' && !emailVerified) {
-      setError('Please verify your email first');
-      return;
+    // Basic validation
+    if (mode === 'signup') {
+      if (!form.username || !form.email || !form.password || !form.confirmPassword) {
+        setError('Please fill in all fields');
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (form.username.length < 3) {
+        setError('Username must be at least 3 characters');
+        return;
+      }
+      if (form.password.length < 6) {
+        setError('Password must be at least 6 characters');
+        return;
+      }
     }
     
     try {
@@ -772,13 +806,21 @@ function App() {
       const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
       const result = await res.json();
       if (result.success) {
-        if (mode === 'login') setUser(result.user);
-        else setMode('login');
+        if (mode === 'login') {
+          setUser(result.user);
+        } else {
+          setError('');
+          setForm({username:'',email:'',password:'',confirmPassword:'',otp:''});
+          setOtpSent(false);
+          setEmailVerified(false);
+          setMode('login');
+        }
       } else {
         setError(result.error);
       }
     } catch (err) {
-      setError('Request failed');
+      console.error('Auth error:', err);
+      setError('Connection failed. Please try again.');
     }
   };
   
@@ -853,7 +895,8 @@ function App() {
               React.createElement('input', {type: 'text', placeholder: 'Enter OTP', className: 'flex-1 p-3 border rounded-xl', value: form.otp, onChange: e => setForm({...form, otp: e.target.value})}),
               React.createElement('button', {type: 'button', onClick: verifyOTP, disabled: emailVerified, className: 'px-4 py-3 bg-green-500 text-white rounded-xl text-sm ' + (emailVerified ? 'opacity-50' : 'hover:bg-green-600')}, emailVerified ? 'Verified' : 'Verify')
             ),
-            emailVerified && React.createElement('p', {className: 'text-green-500 text-sm'}, '✓ Email verified successfully')
+            emailVerified && React.createElement('p', {className: 'text-green-500 text-sm'}, '✓ Email verified successfully'),
+            React.createElement('p', {className: 'text-gray-500 text-xs mt-2'}, 'Email verification is optional. You can register without verifying.')
           ),
           React.createElement('input', {type: 'password', placeholder: 'Password', className: 'w-full p-3 border rounded-xl', value: form.password, onChange: e => setForm({...form, password: e.target.value})}),
           mode === 'signup' && React.createElement('input', {type: 'password', placeholder: 'Confirm Password', className: 'w-full p-3 border rounded-xl', value: form.confirmPassword, onChange: e => setForm({...form, confirmPassword: e.target.value})}),
