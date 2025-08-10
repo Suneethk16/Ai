@@ -2,7 +2,7 @@
 class DatabaseService {
   constructor() {
     this.baseURL = process.env.NODE_ENV === 'production' 
-      ? 'https://your-backend-url.onrender.com/api'
+      ? '/api'
       : 'http://localhost:3002/api';
   }
 

@@ -16,6 +16,11 @@ app.use(express.json());
 // Serve static files from dist directory
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Simple file-based storage
 const DATA_FILE = './data.json';
 
@@ -97,7 +102,12 @@ app.get('/api/activities', (req, res) => {
 
 // Serve React app for all other routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Frontend not built. Run npm run build first.' });
+  }
 });
 
 app.listen(PORT, () => {
