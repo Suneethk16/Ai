@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build && node verify-build.js",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node simple-app.js"
   },
   "dependencies": {
     "lucide-react": "^0.263.1",
