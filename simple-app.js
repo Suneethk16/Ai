@@ -74,10 +74,10 @@ function App() {
     setLoading(true);
     try {
       const prompt = tab === 'quiz' ? 
-        \`Generate 5 quiz questions about "\${topic}" as JSON array with question, options, answer\` :
+        'Generate 5 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
         tab === 'flashcards' ?
-        \`Generate 8 flashcards about "\${topic}" as JSON array with term, definition\` :
-        \`Generate mind map for "\${topic}" as JSON array with concept, related_concepts\`;
+        'Generate 8 flashcards about "' + topic + '" as JSON array with term, definition' :
+        'Generate mind map for "' + topic + '" as JSON array with concept, related_concepts';
       
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
         method: 'POST',
@@ -119,7 +119,7 @@ function App() {
       React.createElement('header', {className: 'text-center mb-8 relative'},
         React.createElement('button', {onClick: () => setUser(null), className: 'absolute top-0 right-0 bg-red-500 text-white px-4 py-2 rounded-lg'}, 'Logout'),
         React.createElement('h1', {className: 'text-5xl font-bold text-purple-800'}, 'AI Study Companion'),
-        React.createElement('p', {className: 'text-gray-600 mt-2'}, \`Welcome back, \${user.username}!\`)
+        React.createElement('p', {className: 'text-gray-600 mt-2'}, 'Welcome back, ' + user.username + '!')
       ),
       React.createElement('main', {className: 'bg-white p-8 rounded-3xl shadow-xl'},
         React.createElement('div', {className: 'flex gap-4 mb-8'},
@@ -129,7 +129,7 @@ function App() {
         React.createElement('div', {className: 'flex justify-center mb-8'},
           React.createElement('div', {className: 'flex bg-gray-100 rounded-full p-1'},
             ['quiz', 'flashcards', 'mindmap'].map(t => 
-              React.createElement('button', {key: t, onClick: () => setTab(t), className: \`px-6 py-2 rounded-full \${tab === t ? 'bg-purple-500 text-white' : 'text-gray-600'}\`}, t.charAt(0).toUpperCase() + t.slice(1))
+              React.createElement('button', {key: t, onClick: () => setTab(t), className: 'px-6 py-2 rounded-full ' + (tab === t ? 'bg-purple-500 text-white' : 'text-gray-600')}, t.charAt(0).toUpperCase() + t.slice(1))
             )
           )
         ),
@@ -157,4 +157,4 @@ ReactDOM.render(React.createElement(App), document.getElementById('root'));
 </script></body></html>`);
 });
 
-app.listen(PORT, () => console.log(\`Server running on port \${PORT}\`));
+app.listen(PORT, () => console.log('Server running on port ' + PORT));
