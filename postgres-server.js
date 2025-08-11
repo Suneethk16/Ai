@@ -53,6 +53,13 @@ const initDB = async () => {
         last_login TIMESTAMP
       )
     `);
+    
+    // Add email_verified column if it doesn't exist
+    try {
+      await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE');
+    } catch (err) {
+      console.log('Column email_verified already exists or error:', err.message);
+    }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_otps (
