@@ -286,7 +286,9 @@ app.post('/api/register', async (req, res) => {
     }
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(500).json({ success: false, error: 'Registration failed. Please try again.' });
+    console.error('Error details:', err.message);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ success: false, error: err.message || 'Registration failed. Please try again.' });
   }
 });
 
