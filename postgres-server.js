@@ -215,11 +215,11 @@ app.post('/api/send-otp', async (req, res) => {
       });
     }
     
-    const emailSent = await sendOTP(email, otp);
+    await sendOTP(email, otp);
     res.json({ 
       success: true, 
-      message: emailSent ? 'OTP sent to email' : 'OTP generated (check server logs)',
-      otp: process.env.NODE_ENV !== 'production' ? otp : undefined
+      message: 'OTP sent! Check server logs if email not received.',
+      debugOtp: otp
     });
   } catch (err) {
     console.error('Send OTP error:', err);
@@ -935,8 +935,7 @@ function App() {
               React.createElement('input', {type: 'text', placeholder: 'Enter OTP', className: 'flex-1 p-3 border rounded-xl', value: form.otp, onChange: e => setForm({...form, otp: e.target.value})}),
               React.createElement('button', {type: 'button', onClick: verifyOTP, disabled: emailVerified, className: 'px-4 py-3 bg-green-500 text-white rounded-xl text-sm ' + (emailVerified ? 'opacity-50' : 'hover:bg-green-600')}, emailVerified ? 'Verified' : 'Verify')
             ),
-            emailVerified && React.createElement('p', {className: 'text-green-500 text-sm'}, '✓ Email verified successfully'),
-            React.createElement('p', {className: 'text-gray-500 text-xs mt-2'}, 'Email verification is optional. You can register without verifying.')
+            emailVerified && React.createElement('p', {className: 'text-green-500 text-sm'}, '✓ Email verified successfully')
           ),
           React.createElement('input', {type: 'password', placeholder: 'Password', className: 'w-full p-3 border rounded-xl', value: form.password, onChange: e => setForm({...form, password: e.target.value})}),
           mode === 'signup' && React.createElement('input', {type: 'password', placeholder: 'Confirm Password', className: 'w-full p-3 border rounded-xl', value: form.confirmPassword, onChange: e => setForm({...form, confirmPassword: e.target.value})}),
