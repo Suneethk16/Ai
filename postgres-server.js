@@ -170,7 +170,11 @@ app.post('/api/send-otp', async (req, res) => {
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
     
+    console.log(`Generating OTP for ${email}: ${otp}`);
+    
     if (usePostgres) {
+      // Clean up expired OTPs first
+      await pool.query('DELETE FROM email_otps WHERE expires_at < NOW()');
       // Delete old OTPs for this email
       await pool.query('DELETE FROM email_otps WHERE email = $1', [email]);
       // Insert new OTP
@@ -178,10 +182,16 @@ app.post('/api/send-otp', async (req, res) => {
         'INSERT INTO email_otps (email, otp, expires_at) VALUES ($1, $2, $3)',
         [email, otp, expiresAt]
       );
+      console.log(`OTP stored in PostgreSQL for ${email}`);
     } else {
       // Memory storage
       if (!memoryData.emailOtps) memoryData.emailOtps = [];
+      // Clean up expired OTPs
+      const now = new Date();
+      memoryData.emailOtps = memoryData.emailOtps.filter(o => new Date(o.expires_at) > now);
+      // Remove old OTPs for this email
       memoryData.emailOtps = memoryData.emailOtps.filter(o => o.email !== email);
+      // Add new OTP
       memoryData.emailOtps.push({
         id: Date.now().toString(),
         email,
@@ -189,6 +199,7 @@ app.post('/api/send-otp', async (req, res) => {
         expires_at: expiresAt.toISOString(),
         created_at: new Date().toISOString()
       });
+      console.log(`OTP stored in memory for ${email}`);
     }
     
     const emailSent = await sendOTP(email, otp);
@@ -200,7 +211,8 @@ app.post('/api/send-otp', async (req, res) => {
     });
   } catch (err) {
     console.error('Send OTP error:', err);
-    console.log(`📧 FALLBACK OTP for ${email}: ${otp}`);
+    const otp = generateOTP();
+    console.log(`📧 FALLBACK OTP for ${req.body.email}: ${otp}`);
     res.json({ success: true, message: 'OTP generated (check server logs)', devOtp: otp });
   }
 });
@@ -220,8 +232,9 @@ app.post('/api/verify-otp', async (req, res) => {
     }
     
     if (usePostgres) {
+      // First check if there's a valid OTP
       const result = await pool.query(
-        'SELECT * FROM email_otps WHERE email = $1 AND otp = $2 AND expires_at > NOW()',
+        'SELECT id FROM email_otps WHERE email = $1 AND otp = $2 AND expires_at > NOW()',
         [email, otp]
       );
       
@@ -229,17 +242,25 @@ app.post('/api/verify-otp', async (req, res) => {
       
       if (result.rows.length === 0) {
         // Check if there's any OTP for this email (expired or wrong)
-        const anyOtp = await pool.query('SELECT * FROM email_otps WHERE email = $1', [email]);
+        const anyOtp = await pool.query('SELECT otp, expires_at FROM email_otps WHERE email = $1 ORDER BY created_at DESC LIMIT 1', [email]);
+        console.log(`Found ${anyOtp.rows.length} OTP records for ${email}`);
+        
         if (anyOtp.rows.length === 0) {
           return res.status(400).json({ success: false, error: 'No OTP found. Please request a new one.' });
         } else {
-          return res.status(400).json({ success: false, error: 'Wrong OTP or expired. Please try again.' });
+          const otpRecord = anyOtp.rows[0];
+          if (new Date(otpRecord.expires_at) <= new Date()) {
+            return res.status(400).json({ success: false, error: 'OTP expired. Please request a new one.' });
+          } else {
+            return res.status(400).json({ success: false, error: 'Wrong OTP. Please check and try again.' });
+          }
         }
       }
       
-      // Delete used OTP
-      await pool.query('DELETE FROM email_otps WHERE email = $1', [email]);
-      console.log(`OTP verified and deleted for ${email}`);
+      // Delete only the specific OTP that was verified
+      const otpId = result.rows[0].id;
+      await pool.query('DELETE FROM email_otps WHERE id = $1', [otpId]);
+      console.log(`OTP verified and deleted for ${email} (ID: ${otpId})`);
     } else {
       // Memory storage
       console.log('Checking memory storage for OTP...');
@@ -261,9 +282,9 @@ app.post('/api/verify-otp', async (req, res) => {
         }
       }
       
-      // Remove used OTP
-      memoryData.emailOtps = memoryData.emailOtps.filter(o => o.email !== email);
-      console.log(`OTP verified and removed for ${email}`);
+      // Remove only the specific OTP that was verified
+      memoryData.emailOtps = memoryData.emailOtps.filter(o => o.id !== otpRecord.id);
+      console.log(`OTP verified and removed for ${email} (ID: ${otpRecord.id})`);
     }
     
     res.json({ success: true, message: 'Email verified successfully' });
@@ -430,6 +451,33 @@ app.get('/api/users', async (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ success: false, error: 'Failed to get users' });
+  }
+});
+
+// Debug endpoint to check OTP status
+app.get('/api/debug-otp/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    
+    if (usePostgres) {
+      const result = await pool.query('SELECT otp, expires_at, created_at FROM email_otps WHERE email = $1 ORDER BY created_at DESC', [email]);
+      res.json({ 
+        success: true, 
+        email: email,
+        otps: result.rows,
+        storage: 'postgresql'
+      });
+    } else {
+      const otps = memoryData.emailOtps?.filter(o => o.email === email) || [];
+      res.json({ 
+        success: true, 
+        email: email,
+        otps: otps,
+        storage: 'memory'
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -978,6 +1026,10 @@ function App() {
         React.createElement('div', {className: 'mt-8 text-center text-xs text-gray-400 space-y-1'},
           React.createElement('p', null, 'Developed by: suneethk176'),
           React.createElement('p', null, 
+            'GitHub: ',
+            React.createElement('a', {href: 'https://github.com/suneethk176', target: '_blank', rel: 'noopener noreferrer', className: 'text-purple-500 hover:text-purple-700'}, 'github.com/suneethk176')
+          ),
+          React.createElement('p', null, 
             'Support: ',
             React.createElement('a', {href: 'mailto:suneethk176@gmail.com', className: 'text-purple-500 hover:text-purple-700'}, 'suneethk176@gmail.com')
           ),
@@ -1067,6 +1119,10 @@ function App() {
         React.createElement('footer', {className: 'mt-8 text-center text-sm text-gray-500 space-y-2'},
           React.createElement('p', null, 'Developed by: suneethk176'),
           React.createElement('p', null, 
+            'GitHub: ',
+            React.createElement('a', {href: 'https://github.com/suneethk176', target: '_blank', rel: 'noopener noreferrer', className: 'text-purple-600 hover:text-purple-800'}, 'github.com/suneethk176')
+          ),
+          React.createElement('p', null, 
             'For issues and support: ',
             React.createElement('a', {href: 'mailto:suneethk176@gmail.com', className: 'text-purple-600 hover:text-purple-800'}, 'suneethk176@gmail.com')
           ),
@@ -1088,6 +1144,24 @@ app.get('/health', (req, res) => {
 // Simple test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ success: true, message: 'Server is working', storage: usePostgres ? 'postgresql' : 'memory' });
+});
+
+// Clean up expired OTPs endpoint
+app.post('/api/cleanup-otps', async (req, res) => {
+  try {
+    if (usePostgres) {
+      const result = await pool.query('DELETE FROM email_otps WHERE expires_at < NOW() RETURNING *');
+      res.json({ success: true, message: `Cleaned up ${result.rows.length} expired OTPs`, storage: 'postgresql' });
+    } else {
+      const before = memoryData.emailOtps?.length || 0;
+      const now = new Date();
+      memoryData.emailOtps = memoryData.emailOtps?.filter(o => new Date(o.expires_at) > now) || [];
+      const after = memoryData.emailOtps.length;
+      res.json({ success: true, message: `Cleaned up ${before - after} expired OTPs`, storage: 'memory' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.listen(PORT, () => {
