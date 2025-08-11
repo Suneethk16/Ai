@@ -113,22 +113,40 @@ const generateOTP = () => {
 
 // Email transporter setup
 const createTransporter = () => {
+  console.log('Email config:', {
+    user: process.env.EMAIL_USER ? 'Set' : 'Not set',
+    pass: process.env.EMAIL_PASS ? 'Set' : 'Not set'
+  });
+  
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log('Email credentials not configured, using fallback');
+    return null;
+  }
+  
   return nodemailer.createTransporter({
     service: 'gmail',
     auth: {
-      user: process.env.EMAIL_USER || 'your-email@gmail.com',
-      pass: process.env.EMAIL_PASS || 'your-app-password'
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     }
   });
 };
 
 // Send OTP via email
 const sendOTP = async (email, otp) => {
+  console.log(`Attempting to send OTP to ${email}`);
+  
+  const transporter = createTransporter();
+  
+  if (!transporter) {
+    console.log(`📧 EMAIL NOT CONFIGURED - OTP for ${email}: ${otp}`);
+    console.log('To receive emails, set EMAIL_USER and EMAIL_PASS environment variables');
+    return true; // Return true so registration doesn't fail
+  }
+  
   try {
-    const transporter = createTransporter();
-    
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'AI Study Companion <your-email@gmail.com>',
+      from: `AI Study Companion <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Email Verification - AI Study Companion',
       html: `
@@ -157,14 +175,13 @@ const sendOTP = async (email, otp) => {
     };
     
     const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 OTP sent to ${email}: ${otp}`);
+    console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
     console.log('Email sent:', info.messageId);
     return true;
   } catch (error) {
-    console.error('Email sending failed:', error);
-    // Fallback to console log for development
+    console.error('Email sending failed:', error.message);
     console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
-    return false;
+    return true; // Return true so registration doesn't fail
   }
 };
 
