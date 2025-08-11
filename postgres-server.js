@@ -141,7 +141,10 @@ const sendOTP = async (email, otp) => {
   if (!transporter) {
     console.log(`📧 EMAIL NOT CONFIGURED - OTP for ${email}: ${otp}`);
     console.log('To receive emails, set EMAIL_USER and EMAIL_PASS environment variables');
-    return true; // Return true so registration doesn't fail
+    console.log('='.repeat(50));
+    console.log(`YOUR OTP CODE: ${otp}`);
+    console.log('='.repeat(50));
+    return false; // Return false to indicate email wasn't sent
   }
   
   try {
@@ -212,11 +215,16 @@ app.post('/api/send-otp', async (req, res) => {
       });
     }
     
-    await sendOTP(email, otp);
-    res.json({ success: true, message: 'OTP sent to email' });
+    const emailSent = await sendOTP(email, otp);
+    res.json({ 
+      success: true, 
+      message: emailSent ? 'OTP sent to email' : 'OTP generated (check server logs)',
+      otp: process.env.NODE_ENV !== 'production' ? otp : undefined
+    });
   } catch (err) {
     console.error('Send OTP error:', err);
-    res.status(500).json({ success: false, error: 'Failed to send OTP' });
+    console.log(`📧 FALLBACK OTP for ${email}: ${otp}`);
+    res.json({ success: true, message: 'OTP generated (check server logs)', devOtp: otp });
   }
 });
 
