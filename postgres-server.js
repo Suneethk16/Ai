@@ -120,7 +120,7 @@ const sendOTP = async (email, otp) => {
     const emailData = {
       service_id: process.env.EMAILJS_SERVICE_ID,
       template_id: process.env.EMAILJS_TEMPLATE_ID,
-      user_id: process.env.EMAILJS_USER_ID,
+      user_id: process.env.EMAILJS_PUBLIC_KEY,
       template_params: {
         to_email: email,
         otp_code: otp,
@@ -154,7 +154,7 @@ const sendOTP = async (email, otp) => {
     console.log('EmailJS config check:', {
       service_id: process.env.EMAILJS_SERVICE_ID || 'NOT_SET',
       template_id: process.env.EMAILJS_TEMPLATE_ID || 'NOT_SET', 
-      user_id: process.env.EMAILJS_USER_ID || 'NOT_SET'
+      public_key: process.env.EMAILJS_PUBLIC_KEY || 'NOT_SET'
     });
     console.log('='.repeat(50));
     console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
