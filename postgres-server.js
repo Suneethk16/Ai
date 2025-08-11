@@ -868,7 +868,7 @@ function App() {
         'Generate 8 flashcards about "' + topic + '" as JSON array with term, definition' :
         'Generate mind map for "' + topic + '" as JSON array with concept, related_concepts';
       
-      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
