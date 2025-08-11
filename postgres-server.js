@@ -974,6 +974,14 @@ function App() {
             mode === 'login' ? "Don't have an account? " : "Already have an account? ",
             React.createElement('button', {type: 'button', onClick: () => setMode(mode === 'login' ? 'signup' : 'login'), className: 'text-purple-600 font-semibold'}, mode === 'login' ? 'Sign Up' : 'Sign In')
           )
+        ),
+        React.createElement('div', {className: 'mt-8 text-center text-xs text-gray-400 space-y-1'},
+          React.createElement('p', null, 'Developed by: suneethk176'),
+          React.createElement('p', null, 
+            'Support: ',
+            React.createElement('a', {href: 'mailto:suneethk176@gmail.com', className: 'text-purple-500 hover:text-purple-700'}, 'suneethk176@gmail.com')
+          ),
+          React.createElement('p', null, '© 2024 All rights reserved')
         )
       )
     );
@@ -1055,6 +1063,14 @@ function App() {
               React.createElement('ul', {className: 'mt-2 space-y-1'}, item.related_concepts?.map((rel, j) => React.createElement('li', {key: j, className: 'text-sm text-gray-600'}, '• ' + rel)))
             )
           )
+        ),
+        React.createElement('footer', {className: 'mt-8 text-center text-sm text-gray-500 space-y-2'},
+          React.createElement('p', null, 'Developed by: suneethk176'),
+          React.createElement('p', null, 
+            'For issues and support: ',
+            React.createElement('a', {href: 'mailto:suneethk176@gmail.com', className: 'text-purple-600 hover:text-purple-800'}, 'suneethk176@gmail.com')
+          ),
+          React.createElement('p', null, '© 2024 AI Study Companion. All rights reserved.')
         )
       )
     )
