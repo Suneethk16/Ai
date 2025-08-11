@@ -773,16 +773,25 @@ function App() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({email: form.email})
       });
+      
+      if (!res.ok) {
+        throw new Error('Server error: ' + res.status);
+      }
+      
       const result = await res.json();
       if (result.success) {
         setOtpSent(true);
         setError('');
+        if (result.debugOtp) {
+          console.log('DEBUG OTP:', result.debugOtp);
+          alert('OTP: ' + result.debugOtp + ' (Check console for details)');
+        }
       } else {
         setError(result.error);
       }
     } catch (err) {
       console.error('Send OTP error:', err);
-      setError('Failed to send OTP. Please check your email and try again.');
+      setError('Server error. Please try again.');
     }
   };
   
