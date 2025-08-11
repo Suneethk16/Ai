@@ -110,52 +110,53 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP via EmailJS (free email service)
+// Send OTP via Resend (server-friendly email service)
 const sendOTP = async (email, otp) => {
   try {
-    console.log('Attempting to send email via EmailJS...');
+    console.log('Attempting to send email via Resend...');
     console.log('Target email:', email);
     console.log('OTP:', otp);
     
     const emailData = {
-      service_id: process.env.EMAILJS_SERVICE_ID,
-      template_id: process.env.EMAILJS_TEMPLATE_ID,
-      user_id: process.env.EMAILJS_PUBLIC_KEY,
-      template_params: {
-        to_email: email,
-        otp_code: otp,
-        from_name: 'AI Study Companion',
-        message: `Your verification code is: ${otp}. This code will expire in 10 minutes.`
-      }
+      from: 'AI Study Companion <onboarding@resend.dev>',
+      to: [email],
+      subject: 'Email Verification - AI Study Companion',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #667eea; text-align: center;">AI Study Companion</h1>
+          <h2>Email Verification</h2>
+          <p>Your verification code is:</p>
+          <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0;">
+            ${otp}
+          </div>
+          <p>This code will expire in 10 minutes.</p>
+          <p>If you didn't request this, please ignore this email.</p>
+        </div>
+      `
     };
     
-    console.log('EmailJS payload:', JSON.stringify(emailData, null, 2));
-    
-    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(emailData)
     });
     
-    const responseText = await response.text();
-    console.log('EmailJS response status:', response.status);
-    console.log('EmailJS response:', responseText);
+    const responseData = await response.json();
+    console.log('Resend response status:', response.status);
+    console.log('Resend response:', responseData);
     
     if (response.ok) {
       console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
       return true;
     } else {
-      throw new Error(`EmailJS failed: ${response.status} - ${responseText}`);
+      throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
     }
   } catch (error) {
     console.error('Email sending failed:', error.message);
-    console.log('EmailJS config check:', {
-      service_id: process.env.EMAILJS_SERVICE_ID || 'NOT_SET',
-      template_id: process.env.EMAILJS_TEMPLATE_ID || 'NOT_SET', 
-      public_key: process.env.EMAILJS_PUBLIC_KEY || 'NOT_SET'
-    });
+    console.log('Resend API Key:', process.env.RESEND_API_KEY ? 'SET' : 'NOT_SET');
     console.log('='.repeat(50));
     console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
     console.log('='.repeat(50));
