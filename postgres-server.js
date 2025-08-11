@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
-import nodemailer from 'nodemailer';
 
 const { Pool } = pg;
 const app = express();
@@ -111,81 +110,12 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Email transporter setup
-const createTransporter = () => {
-  console.log('Email config:', {
-    user: process.env.EMAIL_USER ? 'Set' : 'Not set',
-    pass: process.env.EMAIL_PASS ? 'Set' : 'Not set'
-  });
-  
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log('Email credentials not configured, using fallback');
-    return null;
-  }
-  
-  return nodemailer.createTransporter({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-};
-
-// Send OTP via email
+// Simple OTP mock service
 const sendOTP = async (email, otp) => {
-  console.log(`Attempting to send OTP to ${email}`);
-  
-  const transporter = createTransporter();
-  
-  if (!transporter) {
-    console.log(`📧 EMAIL NOT CONFIGURED - OTP for ${email}: ${otp}`);
-    console.log('To receive emails, set EMAIL_USER and EMAIL_PASS environment variables');
-    console.log('='.repeat(50));
-    console.log(`YOUR OTP CODE: ${otp}`);
-    console.log('='.repeat(50));
-    return false; // Return false to indicate email wasn't sent
-  }
-  
-  try {
-    const mailOptions = {
-      from: `AI Study Companion <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Email Verification - AI Study Companion',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">🎓 AI Study Companion</h1>
-            <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Email Verification</p>
-          </div>
-          
-          <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #333; margin-top: 0;">Verify Your Email Address</h2>
-            <p style="color: #666; line-height: 1.6;">Thank you for signing up! Please use the verification code below to complete your registration:</p>
-            
-            <div style="background: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
-              <h1 style="color: #667eea; font-size: 36px; margin: 0; letter-spacing: 8px; font-family: 'Courier New', monospace;">${otp}</h1>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">This code will expire in <strong>10 minutes</strong>. If you didn't request this verification, please ignore this email.</p>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
-              <p style="color: #999; font-size: 14px; margin: 0;">AI Study Companion - Your Personal Learning Assistant</p>
-            </div>
-          </div>
-        </div>
-      `
-    };
-    
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
-    console.log('Email sent:', info.messageId);
-    return true;
-  } catch (error) {
-    console.error('Email sending failed:', error.message);
-    console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
-    return true; // Return true so registration doesn't fail
-  }
+  console.log('='.repeat(50));
+  console.log(`📧 OTP for ${email}: ${otp}`);
+  console.log('='.repeat(50));
+  return true;
 };
 
 app.post('/api/send-otp', async (req, res) => {
