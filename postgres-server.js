@@ -209,30 +209,61 @@ app.post('/api/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
     
+    console.log(`Verifying OTP for ${email}: ${otp}`);
+    
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: 'Email and OTP are required' });
+    }
+    
+    if (otp.length !== 6) {
+      return res.status(400).json({ success: false, error: 'OTP must be 6 digits' });
+    }
+    
     if (usePostgres) {
       const result = await pool.query(
         'SELECT * FROM email_otps WHERE email = $1 AND otp = $2 AND expires_at > NOW()',
         [email, otp]
       );
       
+      console.log(`PostgreSQL OTP check: found ${result.rows.length} matching records`);
+      
       if (result.rows.length === 0) {
-        return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+        // Check if there's any OTP for this email (expired or wrong)
+        const anyOtp = await pool.query('SELECT * FROM email_otps WHERE email = $1', [email]);
+        if (anyOtp.rows.length === 0) {
+          return res.status(400).json({ success: false, error: 'No OTP found. Please request a new one.' });
+        } else {
+          return res.status(400).json({ success: false, error: 'Wrong OTP or expired. Please try again.' });
+        }
       }
       
       // Delete used OTP
       await pool.query('DELETE FROM email_otps WHERE email = $1', [email]);
+      console.log(`OTP verified and deleted for ${email}`);
     } else {
       // Memory storage
+      console.log('Checking memory storage for OTP...');
+      console.log('Available OTPs:', memoryData.emailOtps);
+      
       const otpRecord = memoryData.emailOtps?.find(o => 
         o.email === email && o.otp === otp && new Date(o.expires_at) > new Date()
       );
       
       if (!otpRecord) {
-        return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+        // Check if there's any OTP for this email
+        const anyOtp = memoryData.emailOtps?.find(o => o.email === email);
+        if (!anyOtp) {
+          return res.status(400).json({ success: false, error: 'No OTP found. Please request a new one.' });
+        } else if (new Date(anyOtp.expires_at) <= new Date()) {
+          return res.status(400).json({ success: false, error: 'OTP expired. Please request a new one.' });
+        } else {
+          return res.status(400).json({ success: false, error: 'Wrong OTP. Please check and try again.' });
+        }
       }
       
       // Remove used OTP
       memoryData.emailOtps = memoryData.emailOtps.filter(o => o.email !== email);
+      console.log(`OTP verified and removed for ${email}`);
     }
     
     res.json({ success: true, message: 'Email verified successfully' });
@@ -780,18 +811,27 @@ function App() {
       setError('Please enter OTP');
       return;
     }
+    if (form.otp.length !== 6) {
+      setError('OTP must be 6 digits');
+      return;
+    }
     try {
       const res = await fetch('/api/verify-otp', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({email: form.email, otp: form.otp})
       });
+      
+      if (!res.ok) {
+        throw new Error('Server error');
+      }
+      
       const result = await res.json();
       if (result.success) {
         setEmailVerified(true);
         setError('');
       } else {
-        setError(result.error);
+        setError(result.error || 'Invalid OTP');
       }
     } catch (err) {
       console.error('Verify OTP error:', err);
