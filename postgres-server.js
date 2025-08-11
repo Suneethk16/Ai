@@ -110,12 +110,42 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Simple OTP mock service
+// Send OTP via EmailJS (free email service)
 const sendOTP = async (email, otp) => {
-  console.log('='.repeat(50));
-  console.log(`📧 OTP for ${email}: ${otp}`);
-  console.log('='.repeat(50));
-  return true;
+  try {
+    // Using EmailJS free service
+    const emailData = {
+      service_id: process.env.EMAILJS_SERVICE_ID || 'service_gmail',
+      template_id: process.env.EMAILJS_TEMPLATE_ID || 'template_otp', 
+      user_id: process.env.EMAILJS_USER_ID || 'your_emailjs_user_id',
+      template_params: {
+        to_email: email,
+        otp_code: otp,
+        subject: 'Email Verification - AI Study Companion'
+      }
+    };
+    
+    const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(emailData)
+    });
+    
+    if (response.ok) {
+      console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
+      return true;
+    } else {
+      throw new Error('EmailJS failed');
+    }
+  } catch (error) {
+    console.error('Email sending failed:', error);
+    console.log('='.repeat(50));
+    console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
+    console.log('='.repeat(50));
+    return false;
+  }
 };
 
 app.post('/api/send-otp', async (req, res) => {
@@ -145,11 +175,12 @@ app.post('/api/send-otp', async (req, res) => {
       });
     }
     
-    await sendOTP(email, otp);
+    const emailSent = await sendOTP(email, otp);
     res.json({ 
       success: true, 
-      message: 'OTP sent! Check server logs if email not received.',
-      debugOtp: otp
+      message: emailSent ? 'OTP sent to your email!' : 'Email failed. Check popup for OTP.',
+      emailSent: emailSent,
+      debugOtp: emailSent ? undefined : otp
     });
   } catch (err) {
     console.error('Send OTP error:', err);
@@ -714,7 +745,10 @@ function App() {
         setError('');
         if (result.debugOtp) {
           console.log('DEBUG OTP:', result.debugOtp);
-          alert('OTP: ' + result.debugOtp + ' (Check console for details)');
+          // Only show alert if email sending failed
+          if (!result.emailSent) {
+            alert('Email failed. OTP: ' + result.debugOtp);
+          }
         }
       } else {
         setError(result.error);
