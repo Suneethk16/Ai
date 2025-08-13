@@ -1358,7 +1358,7 @@ function App() {
                 React.createElement('h3', {className: 'font-bold text-lg'}, 'Premium Plan'),
                 React.createElement('p', {className: 'text-sm opacity-90'}, 'Unlimited topics & questions'),
                 React.createElement('p', {className: 'text-sm opacity-90'}, 'Advanced flashcards & mind maps'),
-                React.createElement('p', {className: 'text-2xl font-bold mt-2'}, '$9.99/month')
+                React.createElement('p', {className: 'text-2xl font-bold mt-2'}, '₹10/month')
               ),
               React.createElement('div', {className: 'flex gap-3'},
                 React.createElement('button', {onClick: () => setShowSubscription(false), className: 'flex-1 px-4 py-2 border border-gray-300 rounded-lg'}, 'Maybe Later'),
@@ -1371,7 +1371,7 @@ function App() {
                       const orderRes = await fetch('/api/create-order', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({amount: 999, currency: 'INR'})
+                        body: JSON.stringify({amount: 10, currency: 'INR'})
                       });
                       
                       console.log('Order response status:', orderRes.status);
@@ -1454,7 +1454,7 @@ function App() {
                     }
                   },
                   className: 'flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold'
-                }, 'Pay ₹999')
+                }, 'Pay ₹10')
               )
             )
           )
