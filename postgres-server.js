@@ -133,22 +133,20 @@ const sendOTP = async (email, otp) => {
     console.log('Target email:', email);
     console.log('OTP:', otp);
     
-    // For now, send all OTPs to your verified email until SSL cert is ready
     const emailData = {
-      from: 'AI Study Companion <onboarding@resend.dev>',
-      to: ['suneethk176@gmail.com'],
-      subject: `OTP for ${email} - AI Study Companion`,
+      from: 'AI Study Companion <noreply@suneethk176.site>',
+      to: [email],
+      subject: 'Email Verification - AI Study Companion',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #667eea; text-align: center;">AI Study Companion</h1>
-          <h2>Email Verification OTP</h2>
-          <p><strong>User Email:</strong> ${email}</p>
-          <p><strong>OTP Code:</strong></p>
-          <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; margin: 20px 0; border: 2px solid #667eea;">
+          <h2>Email Verification</h2>
+          <p>Your verification code is:</p>
+          <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0;">
             ${otp}
           </div>
           <p>This code will expire in 10 minutes.</p>
-          <p><em>Note: This OTP is for user ${email}. Once domain SSL is ready, emails will go directly to users.</em></p>
+          <p>If you didn't request this, please ignore this email.</p>
         </div>
       `
     };
@@ -167,7 +165,7 @@ const sendOTP = async (email, otp) => {
     console.log('Resend response:', responseData);
     
     if (response.ok) {
-      console.log(`📧 OTP sent to your email for user ${email}: ${otp}`);
+      console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
       return true;
     } else {
       throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
