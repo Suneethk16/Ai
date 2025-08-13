@@ -132,24 +132,33 @@ const sendOTP = async (email, otp) => {
     console.log('Attempting to send email via Resend...');
     console.log('Target email:', email);
     console.log('OTP:', otp);
+    console.log('API Key available:', !!process.env.RESEND_API_KEY);
+    
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY not configured');
+    }
     
     const emailData = {
-      from: 'AI Study Companion <noreply@suneethk176.site>',
+      from: 'onboarding@resend.dev',
       to: [email],
       subject: 'Email Verification - AI Study Companion',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h1 style="color: #667eea; text-align: center;">AI Study Companion</h1>
-          <h2>Email Verification</h2>
-          <p>Your verification code is:</p>
-          <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0;">
+          <h1 style="color: #667eea; text-align: center;">🎓 AI Study Companion</h1>
+          <h2 style="color: #333;">Email Verification Required</h2>
+          <p style="font-size: 16px; color: #555;">Please use this verification code to complete your registration:</p>
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; margin: 20px 0; border-radius: 10px; letter-spacing: 3px;">
             ${otp}
           </div>
-          <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this, please ignore this email.</p>
+          <p style="color: #666; font-size: 14px;">⏰ This code expires in 10 minutes</p>
+          <p style="color: #666; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+          <p style="font-size: 12px; color: #999; text-align: center;">Developed by suneethk176 | AI Study Companion</p>
         </div>
       `
     };
+    
+    console.log('Sending email with data:', JSON.stringify(emailData, null, 2));
     
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -162,16 +171,18 @@ const sendOTP = async (email, otp) => {
     
     const responseData = await response.json();
     console.log('Resend response status:', response.status);
-    console.log('Resend response:', responseData);
+    console.log('Resend response:', JSON.stringify(responseData, null, 2));
     
     if (response.ok) {
-      console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
+      console.log(`✅ OTP sent successfully to ${email}: ${otp}`);
       return true;
     } else {
+      console.error(`❌ Resend API failed: ${response.status}`);
+      console.error('Error details:', responseData);
       throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
     }
   } catch (error) {
-    console.error('Email sending failed:', error.message);
+    console.error('❌ Email sending failed:', error.message);
     console.log('='.repeat(50));
     console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
     console.log('='.repeat(50));
@@ -218,12 +229,21 @@ app.post('/api/send-otp', async (req, res) => {
     }
     
     const emailSent = await sendOTP(email, otp);
-    res.json({ 
-      success: true, 
-      message: emailSent ? 'OTP sent to your email!' : 'Email failed. Check popup for OTP.',
-      emailSent: emailSent,
-      debugOtp: emailSent ? undefined : otp
-    });
+    
+    if (emailSent) {
+      res.json({ 
+        success: true, 
+        message: 'OTP sent to your email!',
+        emailSent: true
+      });
+    } else {
+      res.json({ 
+        success: true, 
+        message: 'Email service temporarily unavailable. OTP: ' + otp,
+        emailSent: false,
+        debugOtp: otp
+      });
+    }
   } catch (err) {
     console.error('Send OTP error:', err);
     const otp = generateOTP();
