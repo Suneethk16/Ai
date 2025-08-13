@@ -1011,7 +1011,7 @@ function App() {
       const text = result.candidates[0].content.parts[0].text;
       console.log('Generated text:', text);
       
-      const cleanText = text.replace(/```json|```/g, '').trim();
+      const cleanText = text.replace(/\`\`\`json|\`\`\`/g, '').trim();
       const json = JSON.parse(cleanText);
       
       if (!Array.isArray(json) || json.length === 0) {
