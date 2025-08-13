@@ -817,8 +817,154 @@ ReactDOM.render(React.createElement(AdminPanel), document.getElementById('root')
 
 app.get('*', (req, res) => {
   res.send(`<!DOCTYPE html>
-<html><head><title>AI Study Companion</title></head>
-<body><h1>AI Study Companion</h1><p>Server is running! Full app coming soon...</p></body></html>`);
+<html>
+<head>
+  <title>AI Study Companion</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const {useState} = React;
+    
+    function App() {
+      const [user, setUser] = useState(null);
+      const [generationCount, setGenerationCount] = useState(0);
+      const [showSubscription, setShowSubscription] = useState(false);
+      const [topic, setTopic] = useState('');
+      const [content, setContent] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [tab, setTab] = useState('quiz');
+      
+      const generate = async () => {
+        if (!topic) {
+          alert('Please enter a topic!');
+          return;
+        }
+        
+        if (generationCount >= 10) {
+          setShowSubscription(true);
+          return;
+        }
+        
+        setLoading(true);
+        try {
+          const prompt = tab === 'quiz' ? 
+            'Generate 5 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
+            'Generate 5 flashcards about "' + topic + '" as JSON array with term, definition';
+          
+          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
+          });
+          
+          const result = await res.json();
+          const text = result.candidates[0].content.parts[0].text;
+          const json = JSON.parse(text.replace(/\`\`\`json|\`\`\`/g, ''));
+          setContent(json);
+          setGenerationCount(prev => prev + 1);
+        } catch (err) {
+          alert('Generation failed. Please try again.');
+        }
+        setLoading(false);
+      };
+      
+      if (!user) {
+        return React.createElement('div', {className: 'min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-6'},
+          React.createElement('div', {className: 'bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md text-center'},
+            React.createElement('h1', {className: 'text-3xl font-bold mb-8'}, 'AI Study Companion'),
+            React.createElement('button', {
+              onClick: () => setUser({id: 1, username: 'Demo User'}),
+              className: 'w-full bg-purple-600 text-white py-3 rounded-xl font-semibold'
+            }, 'Start Demo')
+          )
+        );
+      }
+      
+      return React.createElement('div', {className: 'min-h-screen bg-gray-50 p-6'},
+        React.createElement('div', {className: 'max-w-4xl mx-auto'},
+          React.createElement('header', {className: 'text-center mb-8'},
+            React.createElement('h1', {className: 'text-4xl font-bold text-purple-800'}, 'AI Study Companion'),
+            React.createElement('p', {className: 'text-gray-600'}, 'Welcome, ' + user.username + '!')
+          ),
+          React.createElement('main', {className: 'bg-white p-8 rounded-3xl shadow-xl'},
+            React.createElement('div', {className: 'flex gap-4 mb-8'},
+              React.createElement('input', {
+                type: 'text',
+                placeholder: 'Enter topic...',
+                className: 'flex-1 p-4 border-2 border-purple-200 rounded-full text-lg',
+                value: topic,
+                onChange: e => setTopic(e.target.value)
+              }),
+              React.createElement('button', {
+                onClick: generate,
+                disabled: loading,
+                className: 'px-8 py-4 bg-purple-600 text-white rounded-full font-bold'
+              }, loading ? 'Generating...' : 'Generate'),
+              React.createElement('div', {className: 'text-sm text-gray-500 flex items-center'}, 'Free: ' + generationCount + '/10')
+            ),
+            React.createElement('div', {className: 'flex justify-center mb-8'},
+              React.createElement('div', {className: 'flex bg-gray-100 rounded-full p-1'},
+                ['quiz', 'flashcards'].map(t => 
+                  React.createElement('button', {
+                    key: t,
+                    onClick: () => setTab(t),
+                    className: 'px-6 py-2 rounded-full ' + (tab === t ? 'bg-purple-500 text-white' : 'text-gray-600')
+                  }, t.charAt(0).toUpperCase() + t.slice(1))
+                )
+              )
+            ),
+            content && React.createElement('div', {className: 'space-y-4'},
+              content.map((item, i) => 
+                React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
+                  tab === 'quiz' ? [
+                    React.createElement('p', {key: 'q', className: 'font-bold mb-4'}, 'Q' + (i + 1) + '. ' + item.question),
+                    React.createElement('ul', {key: 'opts', className: 'space-y-2'}, 
+                      item.options?.map((opt, j) => 
+                        React.createElement('li', {key: j, className: 'p-3 bg-white rounded-lg'}, opt)
+                      )
+                    ),
+                    React.createElement('p', {key: 'ans', className: 'mt-4 text-green-600 font-semibold'}, 'Answer: ' + item.answer)
+                  ] : [
+                    React.createElement('p', {key: 'term', className: 'font-bold'}, item.term),
+                    React.createElement('p', {key: 'def', className: 'text-gray-600'}, item.definition)
+                  ]
+                )
+              )
+            )
+          ),
+          showSubscription && React.createElement('div', {className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'},
+            React.createElement('div', {className: 'bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-4'},
+              React.createElement('h2', {className: 'text-2xl font-bold text-center mb-4'}, 'Upgrade to Premium'),
+              React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, 'You have used all 10 free generations! Subscribe for unlimited access.'),
+              React.createElement('div', {className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-xl text-center mb-6'},
+                React.createElement('h3', {className: 'font-bold text-lg'}, 'Premium Plan'),
+                React.createElement('p', {className: 'text-sm opacity-90'}, 'Unlimited generations'),
+                React.createElement('p', {className: 'text-2xl font-bold mt-2'}, '$9.99/month')
+              ),
+              React.createElement('div', {className: 'flex gap-3'},
+                React.createElement('button', {
+                  onClick: () => setShowSubscription(false),
+                  className: 'flex-1 px-4 py-2 border border-gray-300 rounded-lg'
+                }, 'Maybe Later'),
+                React.createElement('button', {
+                  onClick: () => alert('Subscription coming soon!'),
+                  className: 'flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold'
+                }, 'Subscribe Now')
+              )
+            )
+          )
+        )
+      );
+    }
+    
+    ReactDOM.render(React.createElement(App), document.getElementById('root'));
+  </script>
+</body>
+</html>`);
 });
 
 // Health check endpoint
