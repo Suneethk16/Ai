@@ -832,6 +832,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('quiz');
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [currentQuestion, setCurrentQuestion] = useState(0);
   const [generationCount, setGenerationCount] = useState(0);
   const [showSubscription, setShowSubscription] = useState(false);
   
@@ -1084,47 +1085,110 @@ function App() {
         error && React.createElement('div', {className: 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4'}, error),
         content && React.createElement('div', {className: 'space-y-4'},
           tab === 'quiz' && (() => {
-            const totalQuestions = content.length;
-            const answeredQuestions = Object.keys(selectedAnswers).length;
-            const correctAnswers = Object.keys(selectedAnswers).filter(i => selectedAnswers[i] === content[i].answer).length;
-            const score = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+            const [currentQuestion, setCurrentQuestion] = useState(0);
+            const [quizCompleted, setQuizCompleted] = useState(false);
+            const maxFreeQuestions = 10;
+            const limitedContent = content.slice(0, maxFreeQuestions);
             
-            if (answeredQuestions === totalQuestions && answeredQuestions > 0) {
-              saveQuizResult(totalQuestions, correctAnswers, score);
+            const handleOptionClick = (selectedOption) => {
+              setSelectedAnswers(prev => ({
+                ...prev,
+                [currentQuestion]: selectedOption
+              }));
+            };
+            
+            const handleNext = () => {
+              if (currentQuestion < limitedContent.length - 1) {
+                setCurrentQuestion(currentQuestion + 1);
+              } else if (currentQuestion === limitedContent.length - 1) {
+                if (content.length > maxFreeQuestions) {
+                  setShowSubscription(true);
+                } else {
+                  setQuizCompleted(true);
+                  const totalQuestions = limitedContent.length;
+                  const correctAnswers = Object.keys(selectedAnswers).filter(i => selectedAnswers[i] === limitedContent[i].answer).length + (selectedAnswers[currentQuestion] === limitedContent[currentQuestion].answer ? 1 : 0);
+                  const score = Math.round((correctAnswers / totalQuestions) * 100);
+                  saveQuizResult(totalQuestions, correctAnswers, score);
+                }
+              }
+            };
+            
+            const handlePrevious = () => {
+              if (currentQuestion > 0) {
+                setCurrentQuestion(currentQuestion - 1);
+              }
+            };
+            
+            const getOptionStyle = (option, correctAnswer) => {
+              const selectedOption = selectedAnswers[currentQuestion];
+              if (!selectedOption) return 'bg-white hover:bg-purple-100 cursor-pointer';
+              
+              if (option === correctAnswer) return 'bg-green-500 text-white';
+              if (option === selectedOption && option !== correctAnswer) return 'bg-red-500 text-white';
+              return 'bg-white';
+            };
+            
+            if (quizCompleted) {
+              const totalQuestions = limitedContent.length;
+              const correctAnswers = Object.keys(selectedAnswers).filter(i => selectedAnswers[i] === limitedContent[i].answer).length;
+              const score = Math.round((correctAnswers / totalQuestions) * 100);
+              
+              return React.createElement('div', {className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-8 rounded-xl text-center'},
+                React.createElement('h3', {className: 'text-3xl font-bold mb-4'}, '🎉 Quiz Completed!'),
+                React.createElement('div', {className: 'text-xl mb-6'},
+                  React.createElement('p', null, 'Final Score: ' + correctAnswers + '/' + totalQuestions + ' (' + score + '%)'),
+                  React.createElement('p', {className: 'text-sm opacity-90 mt-2'}, score >= 80 ? 'Excellent work!' : score >= 60 ? 'Good job!' : 'Keep practicing!')
+                ),
+                React.createElement('button', {
+                  onClick: () => {
+                    setCurrentQuestion(0);
+                    setQuizCompleted(false);
+                    setSelectedAnswers({});
+                    setContent(null);
+                  },
+                  className: 'bg-white text-purple-600 px-6 py-3 rounded-full font-semibold hover:bg-gray-100'
+                }, 'Start New Quiz')
+              );
             }
             
-            return [
-              React.createElement('div', {key: 'score', className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-xl mb-6 text-center'},
-                React.createElement('h3', {className: 'text-2xl font-bold mb-2'}, 'Quiz Score'),
-                React.createElement('div', {className: 'flex justify-center space-x-8 text-lg'},
-                  React.createElement('div', null, 'Score: ' + correctAnswers + '/' + totalQuestions + ' (' + score + '%)'),
-                  React.createElement('div', null, 'Answered: ' + answeredQuestions + '/' + totalQuestions)
-                )
+            const currentQ = limitedContent[currentQuestion];
+            const progress = ((currentQuestion + 1) / limitedContent.length) * 100;
+            
+            return React.createElement('div', {className: 'space-y-6'},
+              React.createElement('div', {className: 'bg-gray-200 rounded-full h-2 mb-4'},
+                React.createElement('div', {className: 'bg-purple-600 h-2 rounded-full transition-all', style: {width: progress + '%'}})
               ),
-              ...content.map((item, i) => 
-                React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
-                  React.createElement('p', {className: 'font-bold mb-4 text-lg'}, 'Q' + (i + 1) + '. ' + item.question),
-                  React.createElement('ul', {className: 'space-y-2'}, item.options?.map((opt, j) => {
-                    const selectedOption = selectedAnswers[i];
-                    let className = 'p-3 rounded-lg cursor-pointer transition-colors ';
-                    if (!selectedOption) {
-                      className += 'bg-white hover:bg-purple-100';
-                    } else if (opt === item.answer) {
-                      className += 'bg-green-500 text-white';
-                    } else if (opt === selectedOption && opt !== item.answer) {
-                      className += 'bg-red-500 text-white';
-                    } else {
-                      className += 'bg-white';
-                    }
-                    return React.createElement('li', {
-                      key: j, 
-                      className: className,
-                      onClick: () => setSelectedAnswers(prev => ({...prev, [i]: opt}))
-                    }, opt);
-                  }))
+              
+              React.createElement('div', {className: 'bg-gray-50 p-6 rounded-xl'},
+                React.createElement('div', {className: 'flex justify-between items-center mb-4'},
+                  React.createElement('span', {className: 'text-sm text-gray-500'}, 'Question ' + (currentQuestion + 1) + ' of ' + limitedContent.length),
+                  content.length > maxFreeQuestions && React.createElement('span', {className: 'text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded'}, 'Free: ' + maxFreeQuestions + ' questions')
+                ),
+                
+                React.createElement('p', {className: 'font-bold text-lg mb-4'}, currentQ.question),
+                React.createElement('ul', {className: 'space-y-2 mb-6'}, currentQ.options?.map((option, oIndex) => 
+                  React.createElement('li', {
+                    key: oIndex,
+                    className: 'p-3 rounded-lg transition-colors ' + getOptionStyle(option, currentQ.answer),
+                    onClick: () => handleOptionClick(option)
+                  }, option)
+                )),
+                
+                React.createElement('div', {className: 'flex justify-between'},
+                  React.createElement('button', {
+                    onClick: handlePrevious,
+                    disabled: currentQuestion === 0,
+                    className: 'px-4 py-2 bg-gray-300 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-400 transition-colors'
+                  }, 'Previous'),
+                  
+                  React.createElement('button', {
+                    onClick: handleNext,
+                    disabled: !selectedAnswers[currentQuestion],
+                    className: 'px-4 py-2 bg-purple-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors'
+                  }, currentQuestion === limitedContent.length - 1 && content.length > maxFreeQuestions ? 'Upgrade for More' : currentQuestion === limitedContent.length - 1 ? 'Finish Quiz' : 'Next')
                 )
               )
-            ];
+            );
           })(),
           tab === 'flashcards' && content.map((item, i) => 
             React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
