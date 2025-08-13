@@ -832,6 +832,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('quiz');
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [generationCount, setGenerationCount] = useState(0);
+  const [showSubscription, setShowSubscription] = useState(false);
   
   const sendOTP = async () => {
     if (!form.email) {
@@ -979,6 +981,13 @@ function App() {
       alert('Please enter a topic first!');
       return;
     }
+    
+    // Check generation limit
+    if (generationCount >= 10) {
+      setShowSubscription(true);
+      return;
+    }
+    
     setLoading(true);
     setSelectedAnswers({});
     setError('');
@@ -998,6 +1007,7 @@ function App() {
       if (result.success) {
         setContent(result.content);
         setSelectedAnswers({});
+        setGenerationCount(prev => prev + 1);
         
         // Log activity
         await fetch('/api/activity', {
@@ -1032,6 +1042,7 @@ function App() {
         const json = JSON.parse(text.replace(/\`\`\`json|\`\`\`/g, ''));
         setContent(json);
         setSelectedAnswers({});
+        setGenerationCount(prev => prev + 1);
       } catch (fallbackErr) {
         setError('Failed to generate content: ' + err.message);
       }
@@ -1091,7 +1102,8 @@ function App() {
       React.createElement('main', {className: 'bg-white p-8 rounded-3xl shadow-xl'},
         React.createElement('div', {className: 'flex gap-4 mb-8'},
           React.createElement('input', {type: 'text', placeholder: 'Enter topic...', className: 'flex-1 p-4 border-2 border-purple-200 rounded-full text-lg', value: topic, onChange: e => setTopic(e.target.value)}),
-          React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 bg-purple-600 text-white rounded-full font-bold'}, loading ? 'Generating...' : 'Generate')
+          React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 bg-purple-600 text-white rounded-full font-bold'}, loading ? 'Generating...' : 'Generate'),
+          React.createElement('div', {className: 'text-sm text-gray-500 flex items-center'}, 'Free: ' + generationCount + '/10')
         ),
         React.createElement('div', {className: 'flex justify-center mb-8'},
           React.createElement('div', {className: 'flex bg-gray-100 rounded-full p-1'},
@@ -1156,6 +1168,24 @@ function App() {
             React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
               React.createElement('p', {className: 'font-bold'}, item.concept),
               React.createElement('ul', {className: 'mt-2 space-y-1'}, item.related_concepts?.map((rel, j) => React.createElement('li', {key: j, className: 'text-sm text-gray-600'}, '• ' + rel)))
+            )
+          )
+        ),
+        showSubscription && React.createElement('div', {className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'},
+          React.createElement('div', {className: 'bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-4'},
+            React.createElement('h2', {className: 'text-2xl font-bold text-center mb-4'}, 'Upgrade to Premium'),
+            React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, 'You\'ve used all 10 free quiz generations! Subscribe to unlock unlimited quizzes and premium features.'),
+            React.createElement('div', {className: 'space-y-4'},
+              React.createElement('div', {className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-xl text-center'},
+                React.createElement('h3', {className: 'font-bold text-lg'}, 'Premium Plan'),
+                React.createElement('p', {className: 'text-sm opacity-90'}, 'Unlimited quiz generations'),
+                React.createElement('p', {className: 'text-sm opacity-90'}, 'Advanced flashcards & mind maps'),
+                React.createElement('p', {className: 'text-2xl font-bold mt-2'}, '$9.99/month')
+              ),
+              React.createElement('div', {className: 'flex gap-3'},
+                React.createElement('button', {onClick: () => setShowSubscription(false), className: 'flex-1 px-4 py-2 border border-gray-300 rounded-lg'}, 'Maybe Later'),
+                React.createElement('button', {onClick: () => alert('Subscription feature coming soon!'), className: 'flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold'}, 'Subscribe Now')
+              )
             )
           )
         ),
