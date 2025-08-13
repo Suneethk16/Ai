@@ -887,6 +887,8 @@ function App() {
   const [showSubscription, setShowSubscription] = useState(false);
   const [usedTopics, setUsedTopics] = useState([]);
   const [currentTopicQuestions, setCurrentTopicQuestions] = useState(0);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   
   const sendOTP = async () => {
     if (!form.email) {
@@ -1221,7 +1223,38 @@ function App() {
   return React.createElement('div', {className: 'min-h-screen bg-gray-50 p-6'},
     React.createElement('div', {className: 'max-w-5xl mx-auto'},
       React.createElement('header', {className: 'text-center mb-8 relative'},
-        React.createElement('button', {onClick: () => setUser(null), className: 'absolute top-0 right-0 bg-red-500 text-white px-4 py-2 rounded-lg'}, 'Logout'),
+        React.createElement('div', {className: 'absolute top-0 left-0'},
+          React.createElement('button', {
+            onClick: () => setShowSubscription(true),
+            className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all'
+          }, '⭐ Subscribe')
+        ),
+        React.createElement('div', {className: 'absolute top-0 right-0'},
+          React.createElement('div', {className: 'relative'},
+            React.createElement('button', {
+              onClick: () => setShowAccountMenu(!showAccountMenu),
+              className: 'flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg transition-colors'
+            },
+              React.createElement('span', {className: 'text-gray-700'}, user.username),
+              React.createElement('span', {className: 'text-gray-500'}, '▼')
+            ),
+            showAccountMenu && React.createElement('div', {className: 'absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-50'},
+              React.createElement('div', {className: 'py-1'},
+                React.createElement('button', {
+                  onClick: () => {
+                    setShowAccountSettings(true);
+                    setShowAccountMenu(false);
+                  },
+                  className: 'block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100'
+                }, '⚙️ Account Settings'),
+                React.createElement('button', {
+                  onClick: () => setUser(null),
+                  className: 'block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100'
+                }, '🚪 Logout')
+              )
+            )
+          )
+        ),
         React.createElement('h1', {className: 'text-5xl font-bold text-purple-800'}, 'AI Study Companion'),
         React.createElement('p', {className: 'text-gray-600 mt-2'}, 'Welcome back, ' + user.username + '!')
       ),
@@ -1347,6 +1380,24 @@ function App() {
             React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
               React.createElement('p', {className: 'font-bold'}, item.concept),
               React.createElement('ul', {className: 'mt-2 space-y-1'}, item.related_concepts?.map((rel, j) => React.createElement('li', {key: j, className: 'text-sm text-gray-600'}, '• ' + rel)))
+            )
+          )
+        ),
+        showAccountSettings && React.createElement('div', {className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'},
+          React.createElement('div', {className: 'bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-4'},
+            React.createElement('h2', {className: 'text-2xl font-bold text-center mb-6'}, 'Account Settings'),
+            React.createElement('div', {className: 'space-y-4'},
+              React.createElement('div', null,
+                React.createElement('label', {className: 'block text-sm font-medium text-gray-700 mb-1'}, 'Username'),
+                React.createElement('input', {type: 'text', value: user.username, disabled: true, className: 'w-full p-3 border rounded-lg bg-gray-50'})
+              ),
+              React.createElement('div', null,
+                React.createElement('label', {className: 'block text-sm font-medium text-gray-700 mb-1'}, 'Email'),
+                React.createElement('input', {type: 'email', value: user.email || 'Not provided', disabled: true, className: 'w-full p-3 border rounded-lg bg-gray-50'})
+              ),
+              React.createElement('div', {className: 'flex gap-3 mt-6'},
+                React.createElement('button', {onClick: () => setShowAccountSettings(false), className: 'flex-1 px-4 py-2 border border-gray-300 rounded-lg'}, 'Close')
+              )
             )
           )
         ),
