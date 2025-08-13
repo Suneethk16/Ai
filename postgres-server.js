@@ -975,9 +975,13 @@ function App() {
   };
   
   const generate = async () => {
-    if (!topic) return;
+    if (!topic) {
+      alert('Please enter a topic first!');
+      return;
+    }
     setLoading(true);
     setSelectedAnswers({});
+    setError('');
     try {
       const prompt = tab === 'quiz' ? 
         'Generate 10 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
@@ -985,14 +989,35 @@ function App() {
         'Generate 8 flashcards about "' + topic + '" as JSON array with term, definition' :
         'Generate mind map for "' + topic + '" as JSON array with concept, related_concepts';
       
+      console.log('Generating content for:', topic, 'Type:', tab);
+      
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
       });
+      
+      if (!res.ok) {
+        throw new Error('API request failed: ' + res.status);
+      }
+      
       const result = await res.json();
+      console.log('API Response:', result);
+      
+      if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+        throw new Error('Invalid API response structure');
+      }
+      
       const text = result.candidates[0].content.parts[0].text;
-      const json = JSON.parse(text.replace(/\`\`\`json|\\n|\`\`\`/g, ''));
+      console.log('Generated text:', text);
+      
+      const cleanText = text.replace(/```json|```/g, '').trim();
+      const json = JSON.parse(cleanText);
+      
+      if (!Array.isArray(json) || json.length === 0) {
+        throw new Error('Generated content is not a valid array');
+      }
+      
       setContent(json);
       setSelectedAnswers({});
       
@@ -1007,7 +1032,9 @@ function App() {
         })
       });
     } catch (err) {
-      console.error(err);
+      console.error('Generation error:', err);
+      setError('Failed to generate content: ' + err.message);
+      alert('Failed to generate content. Please try again.');
     }
     setLoading(false);
   };
@@ -1073,6 +1100,7 @@ function App() {
             )
           )
         ),
+        error && React.createElement('div', {className: 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4'}, error),
         content && React.createElement('div', {className: 'space-y-4'},
           tab === 'quiz' && (() => {
             const totalQuestions = content.length;
