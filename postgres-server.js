@@ -1174,7 +1174,7 @@ function App() {
         showSubscription && React.createElement('div', {className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'},
           React.createElement('div', {className: 'bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-4'},
             React.createElement('h2', {className: 'text-2xl font-bold text-center mb-4'}, 'Upgrade to Premium'),
-            React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, 'You\'ve used all 10 free quiz generations! Subscribe to unlock unlimited quizzes and premium features.'),
+            React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, 'You have used all 10 free quiz generations! Subscribe to unlock unlimited quizzes and premium features.'),
             React.createElement('div', {className: 'space-y-4'},
               React.createElement('div', {className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-xl text-center'},
                 React.createElement('h3', {className: 'font-bold text-lg'}, 'Premium Plan'),
