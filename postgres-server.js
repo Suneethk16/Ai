@@ -12,7 +12,10 @@ app.use(express.json());
 // PostgreSQL connection with better error handling
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://postgres:@localhost:5432/ai_study_companion',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 // For local development, ensure database exists
@@ -28,6 +31,19 @@ pool.on('connect', () => {
 
 pool.on('error', (err) => {
   console.error('PostgreSQL connection error:', err);
+  if (err.code === 'EPIPE') {
+    console.log('Connection pipe broken, will reconnect automatically');
+  }
+});
+
+process.on('SIGINT', () => {
+  pool.end();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  pool.end();
+  process.exit(0);
 });
 
 // In-memory fallback storage
@@ -117,20 +133,22 @@ const sendOTP = async (email, otp) => {
     console.log('Target email:', email);
     console.log('OTP:', otp);
     
+    // For now, send all OTPs to your verified email until SSL cert is ready
     const emailData = {
       from: 'AI Study Companion <onboarding@resend.dev>',
-      to: [email],
-      subject: 'Email Verification - AI Study Companion',
+      to: ['suneethk176@gmail.com'],
+      subject: `OTP for ${email} - AI Study Companion`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #667eea; text-align: center;">AI Study Companion</h1>
-          <h2>Email Verification</h2>
-          <p>Your verification code is:</p>
-          <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0;">
+          <h2>Email Verification OTP</h2>
+          <p><strong>User Email:</strong> ${email}</p>
+          <p><strong>OTP Code:</strong></p>
+          <div style="background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; margin: 20px 0; border: 2px solid #667eea;">
             ${otp}
           </div>
           <p>This code will expire in 10 minutes.</p>
-          <p>If you didn't request this, please ignore this email.</p>
+          <p><em>Note: This OTP is for user ${email}. Once domain SSL is ready, emails will go directly to users.</em></p>
         </div>
       `
     };
@@ -149,14 +167,13 @@ const sendOTP = async (email, otp) => {
     console.log('Resend response:', responseData);
     
     if (response.ok) {
-      console.log(`📧 OTP sent successfully to ${email}: ${otp}`);
+      console.log(`📧 OTP sent to your email for user ${email}: ${otp}`);
       return true;
     } else {
       throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
     }
   } catch (error) {
     console.error('Email sending failed:', error.message);
-    console.log('Resend API Key:', process.env.RESEND_API_KEY ? 'SET' : 'NOT_SET');
     console.log('='.repeat(50));
     console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
     console.log('='.repeat(50));
