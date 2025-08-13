@@ -139,7 +139,7 @@ const sendOTP = async (email, otp) => {
     }
     
     const emailData = {
-      from: 'onboarding@resend.dev',
+      from: 'AI Study Companion <noreply@suneeethk176.site>',
       to: [email],
       subject: 'Email Verification - AI Study Companion',
       html: `
