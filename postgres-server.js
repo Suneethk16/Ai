@@ -175,10 +175,20 @@ const sendOTP = async (email, otp) => {
     
     if (response.ok) {
       console.log(`✅ OTP sent successfully to ${email}: ${otp}`);
+      console.log('Email ID:', responseData.id);
       return true;
     } else {
       console.error(`❌ Resend API failed: ${response.status}`);
       console.error('Error details:', responseData);
+      
+      // Check for specific error types
+      if (responseData.message && responseData.message.includes('blocked')) {
+        console.error('Email blocked - possible spam filter or invalid email');
+      }
+      if (responseData.message && responseData.message.includes('bounce')) {
+        console.error('Email bounced - invalid or non-existent email address');
+      }
+      
       throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
     }
   } catch (error) {
@@ -233,13 +243,13 @@ app.post('/api/send-otp', async (req, res) => {
     if (emailSent) {
       res.json({ 
         success: true, 
-        message: 'OTP sent to your email!',
+        message: 'OTP sent to your email! Check your inbox and spam folder.',
         emailSent: true
       });
     } else {
       res.json({ 
         success: true, 
-        message: 'Email service temporarily unavailable. OTP: ' + otp,
+        message: 'Email delivery failed. Your OTP is: ' + otp + ' (Use this to verify)',
         emailSent: false,
         debugOtp: otp
       });
