@@ -983,58 +983,34 @@ function App() {
     setSelectedAnswers({});
     setError('');
     try {
-      const prompt = tab === 'quiz' ? 
-        'Generate 10 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
-        tab === 'flashcards' ?
-        'Generate 8 flashcards about "' + topic + '" as JSON array with term, definition' :
-        'Generate mind map for "' + topic + '" as JSON array with concept, related_concepts';
-      
-      console.log('Generating content for:', topic, 'Type:', tab);
-      
-      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
+      const res = await fetch('/api/generate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
+        body: JSON.stringify({topic: topic, type: tab})
       });
-      
-      if (!res.ok) {
-        throw new Error('API request failed: ' + res.status);
-      }
       
       const result = await res.json();
-      console.log('API Response:', result);
       
-      if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
-        throw new Error('Invalid API response structure');
+      if (result.success) {
+        setContent(result.content);
+        setSelectedAnswers({});
+        
+        // Log activity
+        await fetch('/api/activity', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            userId: user.id,
+            action: 'generate_content',
+            data: {type: tab, topic: topic}
+          })
+        });
+      } else {
+        throw new Error(result.error || 'Generation failed');
       }
-      
-      const text = result.candidates[0].content.parts[0].text;
-      console.log('Generated text:', text);
-      
-      const cleanText = text.replace(/\`\`\`json|\`\`\`/g, '').trim();
-      const json = JSON.parse(cleanText);
-      
-      if (!Array.isArray(json) || json.length === 0) {
-        throw new Error('Generated content is not a valid array');
-      }
-      
-      setContent(json);
-      setSelectedAnswers({});
-      
-      // Log activity
-      await fetch('/api/activity', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          userId: user.id,
-          action: 'generate_content',
-          data: {type: tab, topic: topic}
-        })
-      });
     } catch (err) {
       console.error('Generation error:', err);
       setError('Failed to generate content: ' + err.message);
-      alert('Failed to generate content. Please try again.');
     }
     setLoading(false);
   };
@@ -1182,6 +1158,39 @@ ReactDOM.render(React.createElement(App), document.getElementById('root'));
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString(), port: PORT });
+});
+
+// Generate content endpoint
+app.post('/api/generate', async (req, res) => {
+  try {
+    const { topic, type } = req.body;
+    
+    const prompt = type === 'quiz' ? 
+      `Generate 10 quiz questions about "${topic}" as JSON array with question, options, answer` :
+      type === 'flashcards' ?
+      `Generate 8 flashcards about "${topic}" as JSON array with term, definition` :
+      `Generate mind map for "${topic}" as JSON array with concept, related_concepts`;
+    
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    const text = result.candidates[0].content.parts[0].text;
+    const cleanText = text.replace(/```json|```/g, '').trim();
+    const json = JSON.parse(cleanText);
+    
+    res.json({ success: true, content: json });
+  } catch (err) {
+    console.error('Generate error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Simple test endpoint
