@@ -836,6 +836,8 @@ function App() {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [generationCount, setGenerationCount] = useState(0);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [usedTopics, setUsedTopics] = useState([]);
+  const [currentTopicQuestions, setCurrentTopicQuestions] = useState(0);
   
   const sendOTP = async () => {
     if (!form.email) {
@@ -978,7 +980,17 @@ function App() {
       return;
     }
     
-    if (generationCount >= 10) {
+    const topicLower = topic.toLowerCase().trim();
+    const isNewTopic = !usedTopics.includes(topicLower);
+    
+    // Check if user has already used one topic and is trying a new one
+    if (usedTopics.length >= 1 && isNewTopic) {
+      setShowSubscription(true);
+      return;
+    }
+    
+    // Check if current topic has reached 10 questions
+    if (!isNewTopic && currentTopicQuestions >= 10) {
       setShowSubscription(true);
       return;
     }
@@ -1062,6 +1074,14 @@ function App() {
       setQuizCompleted(false);
       setGenerationCount(prev => prev + 1);
       
+      // Track topic usage
+      if (isNewTopic) {
+        setUsedTopics(prev => [...prev, topicLower]);
+        setCurrentTopicQuestions(1);
+      } else {
+        setCurrentTopicQuestions(prev => prev + 1);
+      }
+      
       await fetch('/api/activity', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -1131,7 +1151,7 @@ function App() {
         React.createElement('div', {className: 'flex gap-4 mb-8'},
           React.createElement('input', {type: 'text', placeholder: 'Enter topic...', className: 'flex-1 p-4 border-2 border-purple-200 rounded-full text-lg', value: topic, onChange: e => setTopic(e.target.value)}),
           React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 bg-purple-600 text-white rounded-full font-bold'}, loading ? 'Generating...' : 'Generate'),
-          React.createElement('div', {className: 'text-sm text-gray-500 flex items-center'}, 'Free: ' + generationCount + '/10')
+          React.createElement('div', {className: 'text-sm text-gray-500 flex items-center'}, 'Topics: ' + usedTopics.length + '/1 free')
         ),
         React.createElement('div', {className: 'flex justify-center mb-8'},
           React.createElement('div', {className: 'flex bg-gray-100 rounded-full p-1'},
@@ -1157,15 +1177,8 @@ function App() {
               if (currentQuestion < limitedContent.length - 1) {
                 setCurrentQuestion(currentQuestion + 1);
               } else if (currentQuestion === limitedContent.length - 1) {
-                if (content.length > maxFreeQuestions) {
-                  setShowSubscription(true);
-                } else {
-                  setQuizCompleted(true);
-                  const totalQuestions = limitedContent.length;
-                  const correctAnswers = Object.keys(selectedAnswers).filter(i => selectedAnswers[i] === limitedContent[i].answer).length + (selectedAnswers[currentQuestion] === limitedContent[currentQuestion].answer ? 1 : 0);
-                  const score = Math.round((correctAnswers / totalQuestions) * 100);
-                  saveQuizResult(totalQuestions, correctAnswers, score);
-                }
+                // Always show subscription after completing 10 questions
+                setShowSubscription(true);
               }
             };
             
@@ -1241,7 +1254,7 @@ function App() {
                     onClick: handleNext,
                     disabled: !selectedAnswers[currentQuestion],
                     className: 'px-4 py-2 bg-purple-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors'
-                  }, currentQuestion === limitedContent.length - 1 && content.length > maxFreeQuestions ? 'Upgrade for More' : currentQuestion === limitedContent.length - 1 ? 'Finish Quiz' : 'Next')
+                  }, currentQuestion === limitedContent.length - 1 ? 'Upgrade for More' : 'Next')
                 )
               )
             );
@@ -1262,11 +1275,11 @@ function App() {
         showSubscription && React.createElement('div', {className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'},
           React.createElement('div', {className: 'bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-4'},
             React.createElement('h2', {className: 'text-2xl font-bold text-center mb-4'}, 'Upgrade to Premium'),
-            React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, 'You have used all 10 free quiz generations! Subscribe to unlock unlimited quizzes and premium features.'),
+            React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, usedTopics.length >= 1 && topic && !usedTopics.includes(topic.toLowerCase().trim()) ? 'Subscribe to unlock quizzes on additional topics!' : 'Subscribe to unlock more questions on this topic!'),
             React.createElement('div', {className: 'space-y-4'},
               React.createElement('div', {className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-xl text-center'},
                 React.createElement('h3', {className: 'font-bold text-lg'}, 'Premium Plan'),
-                React.createElement('p', {className: 'text-sm opacity-90'}, 'Unlimited quiz generations'),
+                React.createElement('p', {className: 'text-sm opacity-90'}, 'Unlimited topics & questions'),
                 React.createElement('p', {className: 'text-sm opacity-90'}, 'Advanced flashcards & mind maps'),
                 React.createElement('p', {className: 'text-2xl font-bold mt-2'}, '$9.99/month')
               ),
