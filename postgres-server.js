@@ -1365,16 +1365,22 @@ function App() {
                 React.createElement('button', {
                   onClick: async () => {
                     try {
+                      console.log('Starting payment process...');
+                      
                       // Create Razorpay order
                       const orderRes = await fetch('/api/create-order', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({amount: 999, currency: 'INR'})
                       });
+                      
+                      console.log('Order response status:', orderRes.status);
                       const orderData = await orderRes.json();
+                      console.log('Order data:', orderData);
                       
                       if (!orderData.success) {
-                        alert('Failed to create order: ' + orderData.error);
+                        console.error('Order creation failed:', orderData.error);
+                        alert('Failed to create order: ' + (orderData.error || 'Unknown error'));
                         return;
                       }
                       
@@ -1387,25 +1393,36 @@ function App() {
                         description: 'Premium Subscription',
                         order_id: orderData.order.id,
                         handler: async function(response) {
-                          // Verify payment
-                          const verifyRes = await fetch('/api/verify-payment', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                              razorpay_order_id: response.razorpay_order_id,
-                              razorpay_payment_id: response.razorpay_payment_id,
-                              razorpay_signature: response.razorpay_signature,
-                              userId: user.id
-                            })
-                          });
-                          const verifyData = await verifyRes.json();
-                          
-                          if (verifyData.success) {
-                            alert('Payment successful! Premium features unlocked.');
-                            setShowSubscription(false);
-                            // Refresh user data or update state
-                          } else {
-                            alert('Payment verification failed: ' + verifyData.error);
+                          console.log('Payment response:', response);
+                          try {
+                            // Verify payment
+                            const verifyRes = await fetch('/api/verify-payment', {
+                              method: 'POST',
+                              headers: {'Content-Type': 'application/json'},
+                              body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                userId: user.id
+                              })
+                            });
+                            const verifyData = await verifyRes.json();
+                            console.log('Verification response:', verifyData);
+                            
+                            if (verifyData.success) {
+                              alert('Payment successful! Premium features unlocked.');
+                              setShowSubscription(false);
+                            } else {
+                              alert('Payment verification failed: ' + (verifyData.error || 'Unknown error'));
+                            }
+                          } catch (err) {
+                            console.error('Verification error:', err);
+                            alert('Payment verification failed: ' + err.message);
+                          }
+                        },
+                        modal: {
+                          ondismiss: function() {
+                            console.log('Payment modal dismissed');
                           }
                         },
                         prefill: {
@@ -1417,15 +1434,23 @@ function App() {
                         }
                       };
                       
+                      console.log('Razorpay options:', options);
+                      
                       if (window.Razorpay) {
+                        console.log('Opening Razorpay checkout...');
                         const rzp = new window.Razorpay(options);
+                        rzp.on('payment.failed', function (response) {
+                          console.error('Payment failed:', response.error);
+                          alert('Payment failed: ' + response.error.description);
+                        });
                         rzp.open();
                       } else {
+                        console.error('Razorpay not loaded');
                         alert('Razorpay not loaded. Please refresh the page.');
                       }
                     } catch (err) {
                       console.error('Payment error:', err);
-                      alert('Payment failed. Please try again.');
+                      alert('Payment setup failed: ' + err.message);
                     }
                   },
                   className: 'flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold'
@@ -1495,9 +1520,16 @@ app.post('/api/generate', async (req, res) => {
 // Razorpay payment integration
 app.post('/api/create-order', async (req, res) => {
   try {
+    console.log('Create order request:', req.body);
     const { amount, currency = 'INR' } = req.body;
     
+    console.log('Environment check:', {
+      hasKeyId: !!process.env.RAZORPAY_KEY_ID,
+      hasKeySecret: !!process.env.RAZORPAY_KEY_SECRET
+    });
+    
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Razorpay credentials missing');
       return res.status(500).json({ success: false, error: 'Razorpay credentials not configured' });
     }
     
@@ -1510,6 +1542,8 @@ app.post('/api/create-order', async (req, res) => {
       }
     };
     
+    console.log('Creating order with data:', orderData);
+    
     const response = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -1519,12 +1553,15 @@ app.post('/api/create-order', async (req, res) => {
       body: JSON.stringify(orderData)
     });
     
+    console.log('Razorpay API response status:', response.status);
     const order = await response.json();
+    console.log('Razorpay API response:', order);
     
     if (response.ok) {
       res.json({ success: true, order });
     } else {
-      res.status(400).json({ success: false, error: order.error });
+      console.error('Razorpay order creation failed:', order);
+      res.status(400).json({ success: false, error: order.error || order });
     }
   } catch (err) {
     console.error('Create order error:', err);
