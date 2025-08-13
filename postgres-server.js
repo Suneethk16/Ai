@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import pg from 'pg';
+import crypto from 'crypto';
 
 const { Pool } = pg;
 const app = express();
@@ -1573,11 +1574,20 @@ app.post('/api/verify-payment', async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId } = req.body;
     
-    const crypto = require('crypto');
+    console.log('Payment verification request:', { razorpay_order_id, razorpay_payment_id, razorpay_signature, userId });
+    
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      console.error('RAZORPAY_KEY_SECRET not configured');
+      return res.status(500).json({ success: false, error: 'Payment verification not configured' });
+    }
+    
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(razorpay_order_id + '|' + razorpay_payment_id)
       .digest('hex');
+    
+    console.log('Expected signature:', expectedSignature);
+    console.log('Received signature:', razorpay_signature);
     
     if (expectedSignature === razorpay_signature) {
       // Payment verified successfully
