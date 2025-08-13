@@ -1032,38 +1032,67 @@ function App() {
         }
       } catch (apiError) {
         console.log('API failed, using fallback content');
-        // Fallback content
+        // Fallback content with better options
         if (tab === 'quiz') {
-          json = [
-            {question: 'What is the main topic of ' + topic + '?', options: ['Option A', 'Option B', 'Option C', 'Option D'], answer: 'Option A'},
-            {question: 'Which aspect of ' + topic + ' is most important?', options: ['Aspect 1', 'Aspect 2', 'Aspect 3', 'Aspect 4'], answer: 'Aspect 1'},
-            {question: 'How does ' + topic + ' relate to other concepts?', options: ['Relation A', 'Relation B', 'Relation C', 'Relation D'], answer: 'Relation A'},
-            {question: 'What are the key features of ' + topic + '?', options: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4'], answer: 'Feature 1'},
-            {question: 'Why is ' + topic + ' significant?', options: ['Reason A', 'Reason B', 'Reason C', 'Reason D'], answer: 'Reason A'},
-            {question: 'What challenges exist in ' + topic + '?', options: ['Challenge 1', 'Challenge 2', 'Challenge 3', 'Challenge 4'], answer: 'Challenge 1'},
-            {question: 'How can ' + topic + ' be improved?', options: ['Method A', 'Method B', 'Method C', 'Method D'], answer: 'Method A'},
-            {question: 'What is the future of ' + topic + '?', options: ['Future A', 'Future B', 'Future C', 'Future D'], answer: 'Future A'},
-            {question: 'Who benefits from ' + topic + '?', options: ['Group A', 'Group B', 'Group C', 'Group D'], answer: 'Group A'},
-            {question: 'What tools are used in ' + topic + '?', options: ['Tool A', 'Tool B', 'Tool C', 'Tool D'], answer: 'Tool A'}
-          ];
+          const topicLower = topic.toLowerCase();
+          if (topicLower.includes('data science') || topicLower.includes('machine learning') || topicLower.includes('ai')) {
+            json = [
+              {question: 'What is the primary goal of data science?', options: ['Extract insights from data', 'Create websites', 'Design graphics', 'Write documentation'], answer: 'Extract insights from data'},
+              {question: 'Which programming language is most popular in data science?', options: ['Python', 'HTML', 'CSS', 'Assembly'], answer: 'Python'},
+              {question: 'What does ML stand for in data science?', options: ['Machine Learning', 'Multiple Languages', 'Main Logic', 'Memory Location'], answer: 'Machine Learning'},
+              {question: 'Which library is commonly used for data manipulation in Python?', options: ['Pandas', 'jQuery', 'Bootstrap', 'Angular'], answer: 'Pandas'},
+              {question: 'What is supervised learning?', options: ['Learning with labeled data', 'Learning without data', 'Learning with supervision', 'Learning algorithms'], answer: 'Learning with labeled data'},
+              {question: 'What does CSV stand for?', options: ['Comma Separated Values', 'Computer System Values', 'Central Server Values', 'Code Structure Values'], answer: 'Comma Separated Values'},
+              {question: 'Which visualization library is popular in Python?', options: ['Matplotlib', 'React', 'Vue', 'Express'], answer: 'Matplotlib'},
+              {question: 'What is the purpose of data cleaning?', options: ['Remove errors and inconsistencies', 'Add more data', 'Encrypt data', 'Compress data'], answer: 'Remove errors and inconsistencies'},
+              {question: 'What is a neural network inspired by?', options: ['Human brain', 'Computer hardware', 'Internet protocols', 'Database systems'], answer: 'Human brain'},
+              {question: 'What does API stand for?', options: ['Application Programming Interface', 'Advanced Programming Interface', 'Automated Program Integration', 'Application Process Integration'], answer: 'Application Programming Interface'}
+            ];
+          } else if (topicLower.includes('javascript') || topicLower.includes('programming') || topicLower.includes('coding')) {
+            json = [
+              {question: 'What does JavaScript primarily run on?', options: ['Web browsers', 'Only servers', 'Mobile apps only', 'Desktop only'], answer: 'Web browsers'},
+              {question: 'Which symbol is used for comments in JavaScript?', options: ['//', '##', '<!--', '**'], answer: '//'},
+              {question: 'What is a variable in programming?', options: ['Storage for data', 'A function', 'A loop', 'An error'], answer: 'Storage for data'},
+              {question: 'Which method adds an element to an array?', options: ['push()', 'add()', 'insert()', 'append()'], answer: 'push()'},
+              {question: 'What does HTML stand for?', options: ['HyperText Markup Language', 'High Tech Modern Language', 'Home Tool Markup Language', 'Hyperlink Text Management Language'], answer: 'HyperText Markup Language'},
+              {question: 'Which operator is used for equality in JavaScript?', options: ['===', '=', '==', '!='], answer: '==='},
+              {question: 'What is a function in programming?', options: ['Reusable block of code', 'A variable', 'An error', 'A comment'], answer: 'Reusable block of code'},
+              {question: 'Which method converts string to number?', options: ['parseInt()', 'toString()', 'valueOf()', 'stringify()'], answer: 'parseInt()'},
+              {question: 'What does CSS stand for?', options: ['Cascading Style Sheets', 'Computer Style Sheets', 'Creative Style Sheets', 'Colorful Style Sheets'], answer: 'Cascading Style Sheets'},
+              {question: 'Which keyword declares a variable in JavaScript?', options: ['let', 'variable', 'declare', 'make'], answer: 'let'}
+            ];
+          } else {
+            json = [
+              {question: 'What is the main focus of ' + topic + '?', options: ['Understanding core concepts', 'Memorizing facts only', 'Avoiding practice', 'Ignoring fundamentals'], answer: 'Understanding core concepts'},
+              {question: 'Which approach is best for learning ' + topic + '?', options: ['Practice and theory combined', 'Theory only', 'Practice only', 'Neither theory nor practice'], answer: 'Practice and theory combined'},
+              {question: 'What is important when studying ' + topic + '?', options: ['Consistent practice', 'Cramming before tests', 'Avoiding difficult topics', 'Memorizing without understanding'], answer: 'Consistent practice'},
+              {question: 'How should you approach complex topics in ' + topic + '?', options: ['Break into smaller parts', 'Avoid them completely', 'Memorize everything', 'Skip to advanced topics'], answer: 'Break into smaller parts'},
+              {question: 'What helps in mastering ' + topic + '?', options: ['Regular review and practice', 'One-time study', 'Avoiding questions', 'Passive reading only'], answer: 'Regular review and practice'},
+              {question: 'Which resource is most valuable for ' + topic + '?', options: ['Quality educational content', 'Random internet articles', 'Outdated materials', 'Unverified sources'], answer: 'Quality educational content'},
+              {question: 'What should you do when stuck on a ' + topic + ' problem?', options: ['Seek help and research', 'Give up immediately', 'Guess randomly', 'Avoid the problem'], answer: 'Seek help and research'},
+              {question: 'How important are fundamentals in ' + topic + '?', options: ['Very important', 'Not important', 'Somewhat important', 'Completely irrelevant'], answer: 'Very important'},
+              {question: 'What is the best way to retain ' + topic + ' knowledge?', options: ['Apply what you learn', 'Just read about it', 'Memorize definitions', 'Avoid practical application'], answer: 'Apply what you learn'},
+              {question: 'Which mindset helps in learning ' + topic + '?', options: ['Growth mindset', 'Fixed mindset', 'Negative mindset', 'Indifferent mindset'], answer: 'Growth mindset'}
+            ];
+          }
         } else if (tab === 'flashcards') {
           json = [
-            {term: topic + ' Definition', definition: 'Basic definition and explanation of ' + topic},
-            {term: 'Key Concept 1', definition: 'Important concept related to ' + topic},
-            {term: 'Key Concept 2', definition: 'Another important concept in ' + topic},
-            {term: 'Application', definition: 'How ' + topic + ' is applied in practice'},
-            {term: 'Benefits', definition: 'Main benefits and advantages of ' + topic},
-            {term: 'Challenges', definition: 'Common challenges in ' + topic},
-            {term: 'Best Practices', definition: 'Recommended practices for ' + topic},
-            {term: 'Future Trends', definition: 'Emerging trends in ' + topic}
+            {term: topic + ' Overview', definition: 'Comprehensive introduction to the fundamental concepts and principles of ' + topic},
+            {term: 'Core Principles', definition: 'Essential principles that form the foundation of ' + topic + ' understanding'},
+            {term: 'Key Applications', definition: 'Real-world applications and use cases where ' + topic + ' is commonly applied'},
+            {term: 'Main Benefits', definition: 'Primary advantages and positive outcomes of implementing ' + topic + ' concepts'},
+            {term: 'Common Challenges', definition: 'Typical obstacles and difficulties encountered when working with ' + topic},
+            {term: 'Best Practices', definition: 'Proven methods and recommended approaches for effective ' + topic + ' implementation'},
+            {term: 'Tools & Resources', definition: 'Essential tools, software, and resources commonly used in ' + topic},
+            {term: 'Future Outlook', definition: 'Emerging trends and future developments expected in the field of ' + topic}
           ];
         } else {
           json = [
-            {concept: topic, related_concepts: ['Related Concept 1', 'Related Concept 2', 'Related Concept 3']},
-            {concept: 'Key Area 1', related_concepts: ['Sub-area A', 'Sub-area B', 'Sub-area C']},
-            {concept: 'Key Area 2', related_concepts: ['Component X', 'Component Y', 'Component Z']},
-            {concept: 'Applications', related_concepts: ['Use Case 1', 'Use Case 2', 'Use Case 3']},
-            {concept: 'Benefits', related_concepts: ['Advantage 1', 'Advantage 2', 'Advantage 3']}
+            {concept: topic, related_concepts: ['Fundamentals', 'Core Principles', 'Key Applications']},
+            {concept: 'Learning Path', related_concepts: ['Beginner Level', 'Intermediate Skills', 'Advanced Topics']},
+            {concept: 'Practical Skills', related_concepts: ['Hands-on Practice', 'Real Projects', 'Problem Solving']},
+            {concept: 'Tools & Methods', related_concepts: ['Essential Tools', 'Best Practices', 'Modern Techniques']},
+            {concept: 'Career Growth', related_concepts: ['Job Opportunities', 'Skill Development', 'Professional Network']}
           ];
         }
       }
