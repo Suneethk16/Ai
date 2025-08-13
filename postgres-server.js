@@ -833,6 +833,7 @@ function App() {
   const [tab, setTab] = useState('quiz');
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [quizCompleted, setQuizCompleted] = useState(false);
   const [generationCount, setGenerationCount] = useState(0);
   const [showSubscription, setShowSubscription] = useState(false);
   
@@ -1002,6 +1003,8 @@ function App() {
       const json = JSON.parse(text.replace(/\`\`\`json|\`\`\`/g, ''));
       setContent(json);
       setSelectedAnswers({});
+      setCurrentQuestion(0);
+      setQuizCompleted(false);
       setGenerationCount(prev => prev + 1);
       
       await fetch('/api/activity', {
@@ -1085,8 +1088,6 @@ function App() {
         error && React.createElement('div', {className: 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4'}, error),
         content && React.createElement('div', {className: 'space-y-4'},
           tab === 'quiz' && (() => {
-            const [currentQuestion, setCurrentQuestion] = useState(0);
-            const [quizCompleted, setQuizCompleted] = useState(false);
             const maxFreeQuestions = 10;
             const limitedContent = content.slice(0, maxFreeQuestions);
             
