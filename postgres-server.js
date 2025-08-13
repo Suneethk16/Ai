@@ -1380,7 +1380,7 @@ function App() {
                       
                       // Initialize Razorpay
                       const options = {
-                        key: 'rzp_test_your_key_here', // Replace with your Razorpay key
+                        key: 'rzp_test_R4xyFG58bENLu6',
                         amount: orderData.order.amount,
                         currency: orderData.order.currency,
                         name: 'AI Study Companion',
