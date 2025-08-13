@@ -989,6 +989,10 @@ function App() {
         body: JSON.stringify({topic: topic, type: tab})
       });
       
+      if (!res.ok) {
+        throw new Error('Server error: ' + res.status);
+      }
+      
       const result = await res.json();
       
       if (result.success) {
@@ -1010,7 +1014,27 @@ function App() {
       }
     } catch (err) {
       console.error('Generation error:', err);
-      setError('Failed to generate content: ' + err.message);
+      // Fallback to direct API call if server endpoint fails
+      try {
+        const prompt = tab === 'quiz' ? 
+          'Generate 10 quiz questions about "' + topic + '" as JSON array with question, options, answer' :
+          tab === 'flashcards' ?
+          'Generate 8 flashcards about "' + topic + '" as JSON array with term, definition' :
+          'Generate mind map for "' + topic + '" as JSON array with concept, related_concepts';
+        
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyCSyd7_6ZAJwSHaN12Ik1Ld-JMD4boKvzE', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
+        });
+        const result = await res.json();
+        const text = result.candidates[0].content.parts[0].text;
+        const json = JSON.parse(text.replace(/\`\`\`json|\`\`\`/g, ''));
+        setContent(json);
+        setSelectedAnswers({});
+      } catch (fallbackErr) {
+        setError('Failed to generate content: ' + err.message);
+      }
     }
     setLoading(false);
   };
