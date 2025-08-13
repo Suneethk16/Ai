@@ -998,9 +998,25 @@ function App() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({contents: [{role: 'user', parts: [{text: prompt}]}]})
       });
+      
+      if (!res.ok) {
+        throw new Error('API request failed: ' + res.status);
+      }
+      
       const result = await res.json();
+      
+      if (!result.candidates || !result.candidates[0] || !result.candidates[0].content) {
+        throw new Error('Invalid API response format');
+      }
+      
       const text = result.candidates[0].content.parts[0].text;
-      const json = JSON.parse(text.replace(/\`\`\`json|\`\`\`/g, ''));
+      const cleanText = text.replace(/\`\`\`json|\`\`\`/g, '').trim();
+      const json = JSON.parse(cleanText);
+      
+      if (!Array.isArray(json) || json.length === 0) {
+        throw new Error('Generated content is not a valid array');
+      }
+      
       setContent(json);
       setSelectedAnswers({});
       setCurrentQuestion(0);
@@ -1018,7 +1034,13 @@ function App() {
       });
     } catch (err) {
       console.error('Generation error:', err);
-      setError('Failed to generate content. Please try again.');
+      if (err.message.includes('JSON')) {
+        setError('Failed to parse generated content. Please try again.');
+      } else if (err.message.includes('API')) {
+        setError('AI service temporarily unavailable. Please try again.');
+      } else {
+        setError('Failed to generate content: ' + err.message);
+      }
     }
     setLoading(false);
   };
