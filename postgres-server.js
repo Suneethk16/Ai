@@ -145,8 +145,9 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP via Resend (server-friendly email service)
+// Send OTP via multiple email services
 const sendOTP = async (email, otp) => {
+  // Try Resend first
   try {
     console.log('Attempting to send email via Resend...');
     console.log('Target email:', email);
@@ -158,7 +159,7 @@ const sendOTP = async (email, otp) => {
     }
     
     const emailData = {
-      from: 'AI Study Companion <noreply@suneeethk176.site>',
+      from: 'AI Study Companion <onboarding@resend.dev>',
       to: [email],
       subject: 'Email Verification - AI Study Companion',
       html: `
@@ -210,12 +211,55 @@ const sendOTP = async (email, otp) => {
       
       throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
     }
-  } catch (error) {
-    console.error('❌ Email sending failed:', error.message);
-    console.log('='.repeat(50));
-    console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
-    console.log('='.repeat(50));
-    return false;
+  } catch (resendError) {
+    console.error('❌ Resend failed:', resendError.message);
+    
+    // Try backup email service (Gmail SMTP)
+    try {
+      console.log('Trying backup email service...');
+      
+      if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+        throw new Error('Gmail credentials not configured');
+      }
+      
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransporter({
+        service: 'gmail',
+        auth: {
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_PASS
+        }
+      });
+      
+      const mailOptions = {
+        from: `"AI Study Companion" <${process.env.GMAIL_USER}>`,
+        to: email,
+        subject: 'Email Verification - AI Study Companion',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h1 style="color: #667eea; text-align: center;">🎓 AI Study Companion</h1>
+            <h2 style="color: #333;">Email Verification Required</h2>
+            <p style="font-size: 16px; color: #555;">Please use this verification code to complete your registration:</p>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; margin: 20px 0; border-radius: 10px; letter-spacing: 3px;">
+              ${otp}
+            </div>
+            <p style="color: #666; font-size: 14px;">⏰ This code expires in 10 minutes</p>
+            <p style="color: #666; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
+          </div>
+        `
+      };
+      
+      await transporter.sendMail(mailOptions);
+      console.log(`✅ OTP sent via Gmail to ${email}: ${otp}`);
+      return true;
+      
+    } catch (gmailError) {
+      console.error('❌ Gmail backup failed:', gmailError.message);
+      console.log('='.repeat(50));
+      console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
+      console.log('='.repeat(50));
+      return false;
+    }
   }
 };
 
@@ -268,16 +312,16 @@ app.post('/api/send-otp', async (req, res) => {
     } else {
       res.json({ 
         success: true, 
-        message: 'Email delivery failed. Your OTP is: ' + otp + ' (Use this to verify)',
+        message: 'Email service temporarily unavailable. Your OTP is: ' + otp,
         emailSent: false,
-        debugOtp: otp
+        otp: otp
       });
     }
   } catch (err) {
     console.error('Send OTP error:', err);
     const otp = generateOTP();
     console.log(`📧 FALLBACK OTP for ${req.body.email}: ${otp}`);
-    res.json({ success: true, message: 'OTP generated (check server logs)', devOtp: otp });
+    res.json({ success: true, message: 'Email service error. Your OTP is: ' + otp, otp: otp });
   }
 });
 
