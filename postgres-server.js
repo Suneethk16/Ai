@@ -915,50 +915,151 @@ app.get('*', (req, res) => {
 <body><div id="root"></div><canvas id="bg-canvas" style="position: fixed; top: 0; left: 0; z-index: -1; width: 100%; height: 100%;"></canvas><script>
 const {useState, useEffect} = React;
 
-// Three.js Background Animation
-let scene, camera, renderer, particles;
+// Futuristic 3D Environment
+let scene, camera, renderer, neuralNet, holoCubes, dataStream;
+let mouse = { x: 0, y: 0 };
+let time = 0;
 
 function initThreeJS() {
   const canvas = document.getElementById('bg-canvas');
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+  scene.fog = new THREE.Fog(0x0a0a2e, 1, 2000);
+  
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   
-  // Create floating particles
+  createNeuralNetwork();
+  createHolographicCubes();
+  createDataStream();
+  
+  const light1 = new THREE.PointLight(0x00ffff, 1, 1000);
+  light1.position.set(200, 200, 200);
+  scene.add(light1);
+  
+  const light2 = new THREE.PointLight(0xff00ff, 1, 1000);
+  light2.position.set(-200, -200, 200);
+  scene.add(light2);
+  
+  camera.position.z = 800;
+  
+  document.addEventListener('mousemove', (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  });
+  
+  animate();
+}
+
+function createNeuralNetwork() {
+  const group = new THREE.Group();
+  
+  for (let i = 0; i < 100; i++) {
+    const geometry = new THREE.SphereGeometry(3, 8, 8);
+    const material = new THREE.MeshPhongMaterial({ 
+      color: 0x00ffff, 
+      transparent: true, 
+      opacity: 0.7,
+      emissive: 0x004444
+    });
+    
+    const sphere = new THREE.Mesh(geometry, material);
+    sphere.position.set(
+      (Math.random() - 0.5) * 1000,
+      (Math.random() - 0.5) * 600,
+      (Math.random() - 0.5) * 400
+    );
+    group.add(sphere);
+  }
+  
+  neuralNet = group;
+  scene.add(neuralNet);
+}
+
+function createHolographicCubes() {
+  const group = new THREE.Group();
+  
+  for (let i = 0; i < 20; i++) {
+    const geometry = new THREE.BoxGeometry(30, 30, 30);
+    const material = new THREE.MeshPhongMaterial({
+      color: 0xff00ff,
+      transparent: true,
+      opacity: 0.3,
+      wireframe: true
+    });
+    
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(
+      (Math.random() - 0.5) * 1200,
+      (Math.random() - 0.5) * 800,
+      (Math.random() - 0.5) * 600
+    );
+    group.add(cube);
+  }
+  
+  holoCubes = group;
+  scene.add(holoCubes);
+}
+
+function createDataStream() {
   const geometry = new THREE.BufferGeometry();
   const positions = [];
   const colors = [];
   
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 3000; i++) {
     positions.push((Math.random() - 0.5) * 2000);
-    positions.push((Math.random() - 0.5) * 2000);
-    positions.push((Math.random() - 0.5) * 2000);
+    positions.push((Math.random() - 0.5) * 1000);
+    positions.push((Math.random() - 0.5) * 1000);
     
-    colors.push(0.5 + Math.random() * 0.5);
-    colors.push(0.3 + Math.random() * 0.7);
-    colors.push(0.8 + Math.random() * 0.2);
+    colors.push(0, 1, 1);
   }
   
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   
-  const material = new THREE.PointsMaterial({ size: 3, vertexColors: true, transparent: true, opacity: 0.6 });
-  particles = new THREE.Points(geometry, material);
-  scene.add(particles);
+  const material = new THREE.PointsMaterial({ 
+    size: 2, 
+    vertexColors: true, 
+    transparent: true, 
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending
+  });
   
-  camera.position.z = 1000;
-  
-  animate();
+  dataStream = new THREE.Points(geometry, material);
+  scene.add(dataStream);
 }
 
 function animate() {
   requestAnimationFrame(animate);
+  time += 0.01;
   
-  if (particles) {
-    particles.rotation.x += 0.0005;
-    particles.rotation.y += 0.001;
+  if (neuralNet) {
+    neuralNet.rotation.y += 0.003;
+    neuralNet.children.forEach((node, i) => {
+      node.material.emissiveIntensity = 0.3 + Math.sin(time * 3 + i) * 0.2;
+    });
   }
+  
+  if (holoCubes) {
+    holoCubes.children.forEach((cube, i) => {
+      cube.rotation.x += 0.02;
+      cube.rotation.y += 0.015;
+      cube.position.y += Math.sin(time + i) * 0.8;
+    });
+  }
+  
+  if (dataStream) {
+    dataStream.rotation.y += 0.002;
+    const positions = dataStream.geometry.attributes.position.array;
+    for (let i = 1; i < positions.length; i += 3) {
+      positions[i] += Math.sin(time + i) * 0.5;
+    }
+    dataStream.geometry.attributes.position.needsUpdate = true;
+  }
+  
+  camera.position.x += (mouse.x * 200 - camera.position.x) * 0.05;
+  camera.position.y += (-mouse.y * 200 - camera.position.y) * 0.05;
+  camera.lookAt(scene.position);
   
   renderer.render(scene, camera);
 }
@@ -1285,11 +1386,11 @@ function App() {
   };
   
   if (!user) {
-    return React.createElement('div', {className: 'min-h-screen bg-gradient-to-br from-purple-900/20 to-blue-900/20 backdrop-blur-sm flex items-center justify-center p-6'},
-      React.createElement('div', {className: 'bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8 w-full max-w-md'},
-        React.createElement('h1', {className: 'text-3xl font-bold text-center mb-8'}, mode === 'login' ? 'Welcome Back' : 'Create Account'),
+    return React.createElement('div', {className: 'min-h-screen flex items-center justify-center p-6', style: {background: 'radial-gradient(circle at 50% 50%, rgba(0,255,255,0.1) 0%, rgba(255,0,255,0.1) 50%, rgba(0,0,0,0.9) 100%)'}},
+      React.createElement('div', {className: 'relative overflow-hidden', style: {background: 'linear-gradient(135deg, rgba(0,255,255,0.1) 0%, rgba(255,0,255,0.1) 100%)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,255,255,0.3)', borderRadius: '20px', padding: '40px', maxWidth: '400px', width: '100%', boxShadow: '0 25px 50px rgba(0,255,255,0.2)'}},
+        React.createElement('h1', {className: 'text-3xl font-bold text-center mb-8', style: {color: '#00ffff', textShadow: '0 0 20px rgba(0,255,255,0.8)', fontFamily: 'monospace'}}, mode === 'login' ? '◉ NEURAL LOGIN' : '◉ NEURAL REGISTER'),
         React.createElement('form', {onSubmit: handleAuth, className: 'space-y-4'},
-          React.createElement('input', {type: 'text', placeholder: 'Username', className: 'w-full p-3 border rounded-xl', value: form.username, onChange: e => setForm({...form, username: e.target.value})}),
+          React.createElement('input', {type: 'text', placeholder: '▶ Neural ID', className: 'w-full p-4 rounded-xl transition-all duration-300', style: {background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(0,255,255,0.5)', color: '#00ffff', fontSize: '16px', fontFamily: 'monospace'}, value: form.username, onChange: e => setForm({...form, username: e.target.value}), onFocus: e => e.target.style.boxShadow = '0 0 20px rgba(0,255,255,0.5)', onBlur: e => e.target.style.boxShadow = 'none'}),
           mode === 'signup' && React.createElement('div', {className: 'space-y-2'},
             React.createElement('div', {className: 'flex gap-2'},
               React.createElement('input', {type: 'email', placeholder: 'Email', className: 'flex-1 p-3 border rounded-xl', value: form.email, onChange: e => setForm({...form, email: e.target.value})}),
@@ -1326,7 +1427,7 @@ function App() {
     );
   }
   
-  return React.createElement('div', {className: 'min-h-screen bg-gradient-to-br from-purple-50/30 to-blue-50/30 backdrop-blur-sm p-6'},
+  return React.createElement('div', {className: 'min-h-screen p-6', style: {background: 'radial-gradient(circle at 20% 80%, rgba(0,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,0,255,0.15) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(0,100,255,0.1) 0%, transparent 50%)'}},
     React.createElement('div', {className: 'max-w-5xl mx-auto'},
       React.createElement('header', {className: 'text-center mb-8 relative'},
         React.createElement('div', {className: 'absolute top-0 left-0'},
@@ -1361,13 +1462,13 @@ function App() {
             )
           )
         ),
-        React.createElement('h1', {className: 'text-5xl font-bold text-purple-800'}, 'AI Study Companion'),
+        React.createElement('h1', {className: 'text-6xl font-bold text-center mb-4', style: {background: 'linear-gradient(45deg, #00ffff, #ff00ff, #00ffff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', textShadow: '0 0 30px rgba(0,255,255,0.5)', fontFamily: 'monospace', letterSpacing: '3px'}}, '◉ NEURAL STUDY ◉'),
         React.createElement('p', {className: 'text-gray-600 mt-2'}, 'Welcome back, ' + user.username + '!')
       ),
-      React.createElement('main', {className: 'bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-xl border border-white/20'},
+      React.createElement('main', {className: 'p-8 rounded-3xl relative overflow-hidden', style: {background: 'linear-gradient(135deg, rgba(0,20,40,0.9) 0%, rgba(20,0,40,0.9) 100%)', backdropFilter: 'blur(20px)', border: '2px solid rgba(0,255,255,0.3)', boxShadow: '0 25px 50px rgba(0,255,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'}},
         React.createElement('div', {className: 'flex gap-4 mb-8'},
-          React.createElement('input', {type: 'text', placeholder: 'Enter topic...', className: 'flex-1 p-4 border-2 border-purple-200 rounded-full text-lg', value: topic, onChange: e => setTopic(e.target.value)}),
-          React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 bg-purple-600 text-white rounded-full font-bold'}, loading ? 'Generating...' : 'Generate'),
+          React.createElement('input', {type: 'text', placeholder: '▶ Initialize Neural Topic...', className: 'flex-1 p-4 rounded-full text-lg transition-all duration-300', style: {background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(0,255,255,0.5)', color: '#00ffff', fontFamily: 'monospace', fontSize: '18px'}, value: topic, onChange: e => setTopic(e.target.value), onFocus: e => e.target.style.boxShadow = '0 0 30px rgba(0,255,255,0.6)', onBlur: e => e.target.style.boxShadow = 'none'}),
+          React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 rounded-full font-bold transition-all duration-300 transform hover:scale-105', style: {background: loading ? 'rgba(100,100,100,0.5)' : 'linear-gradient(45deg, #00ffff, #ff00ff)', color: '#000', fontFamily: 'monospace', fontSize: '16px', border: '2px solid rgba(0,255,255,0.8)', boxShadow: '0 0 20px rgba(0,255,255,0.5)'}}, loading ? '◉ PROCESSING...' : '▶ GENERATE'),
           React.createElement('div', {className: 'text-sm text-gray-500 flex items-center'}, 'Topics: ' + usedTopics.length + '/1 free')
         ),
         React.createElement('div', {className: 'flex justify-center mb-8'},
@@ -1407,11 +1508,11 @@ function App() {
             
             const getOptionStyle = (option, correctAnswer) => {
               const selectedOption = selectedAnswers[currentQuestion];
-              if (!selectedOption) return 'bg-white/70 hover:bg-purple-100/80 text-gray-800';
+              if (!selectedOption) return {background: 'rgba(0,20,40,0.8)', border: '1px solid rgba(0,255,255,0.3)', color: '#00ffff'};
               
-              if (option === correctAnswer) return 'bg-gradient-to-r from-green-400 to-green-600 text-white shadow-lg';
-              if (option === selectedOption && option !== correctAnswer) return 'bg-gradient-to-r from-red-400 to-red-600 text-white shadow-lg';
-              return 'bg-white/50 text-gray-600';
+              if (option === correctAnswer) return {background: 'linear-gradient(45deg, #00ff00, #00ffaa)', color: '#000', boxShadow: '0 0 20px rgba(0,255,0,0.6)'};
+              if (option === selectedOption && option !== correctAnswer) return {background: 'linear-gradient(45deg, #ff0040, #ff4080)', color: '#fff', boxShadow: '0 0 20px rgba(255,0,64,0.6)'};
+              return {background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(100,100,100,0.3)', color: '#888'};
             };
             
             if (quizCompleted) {
@@ -1445,20 +1546,20 @@ function App() {
                 React.createElement('div', {className: 'bg-purple-600 h-2 rounded-full transition-all', style: {width: progress + '%'}})
               ),
               
-              React.createElement('div', {className: 'bg-white/60 backdrop-blur-sm p-6 rounded-xl border border-white/30 shadow-lg'},
+              React.createElement('div', {className: 'p-6 rounded-xl relative overflow-hidden transform transition-all duration-500 hover:scale-105', style: {background: 'linear-gradient(135deg, rgba(0,40,80,0.9) 0%, rgba(40,0,80,0.9) 100%)', backdropFilter: 'blur(15px)', border: '1px solid rgba(0,255,255,0.4)', boxShadow: '0 15px 35px rgba(0,255,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'}},
                 React.createElement('div', {className: 'flex justify-between items-center mb-4'},
                   React.createElement('span', {className: 'text-sm text-gray-500'}, 'Question ' + (currentQuestion + 1) + ' of ' + limitedContent.length),
                   content.length > maxFreeQuestions && React.createElement('span', {className: 'text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded'}, 'Free: ' + maxFreeQuestions + ' questions')
                 ),
                 
-                React.createElement('p', {className: 'font-bold text-lg mb-4'}, currentQ.question),
-                React.createElement('ul', {className: 'space-y-3 mb-6'}, currentQ.options?.map((option, oIndex) => 
+                React.createElement('p', {className: 'font-bold text-xl mb-6', style: {color: '#00ffff', textShadow: '0 0 10px rgba(0,255,255,0.8)', fontFamily: 'monospace', lineHeight: '1.6'}}, '▶ ' + currentQ.question),
+                React.createElement('ul', {className: 'space-y-4 mb-6'}, currentQ.options?.map((option, oIndex) => 
                   React.createElement('li', {
                     key: oIndex,
-                    className: 'p-4 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg cursor-pointer border border-white/20 ' + getOptionStyle(option, currentQ.answer),
+                    className: 'p-4 rounded-xl transition-all duration-300 transform hover:scale-105 cursor-pointer font-mono',
                     onClick: () => handleOptionClick(option),
-                    style: { backdropFilter: 'blur(10px)' }
-                  }, option)
+                    style: {...getOptionStyle(option, currentQ.answer), fontSize: '16px', fontWeight: 'bold'}
+                  }, '◆ ' + option)
                 )),
                 
                 React.createElement('div', {className: 'flex justify-between'},
