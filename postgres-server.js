@@ -1069,6 +1069,20 @@ function handleResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Adjust 3D elements for mobile
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      camera.position.z = 1200;
+      if (neuralNet) neuralNet.scale.set(0.7, 0.7, 0.7);
+      if (holoCubes) holoCubes.scale.set(0.6, 0.6, 0.6);
+      if (dataStream) dataStream.scale.set(0.8, 0.8, 0.8);
+    } else {
+      camera.position.z = 800;
+      if (neuralNet) neuralNet.scale.set(1, 1, 1);
+      if (holoCubes) holoCubes.scale.set(1, 1, 1);
+      if (dataStream) dataStream.scale.set(1, 1, 1);
+    }
   }
 }
 
@@ -1386,11 +1400,11 @@ function App() {
   };
   
   if (!user) {
-    return React.createElement('div', {className: 'min-h-screen flex items-center justify-center p-6', style: {background: 'radial-gradient(circle at 50% 50%, rgba(0,255,255,0.1) 0%, rgba(255,0,255,0.1) 50%, rgba(0,0,0,0.9) 100%)'}},
-      React.createElement('div', {className: 'relative overflow-hidden', style: {background: 'linear-gradient(135deg, rgba(0,255,255,0.1) 0%, rgba(255,0,255,0.1) 100%)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,255,255,0.3)', borderRadius: '20px', padding: '40px', maxWidth: '400px', width: '100%', boxShadow: '0 25px 50px rgba(0,255,255,0.2)'}},
-        React.createElement('h1', {className: 'text-3xl font-bold text-center mb-8', style: {color: '#00ffff', textShadow: '0 0 20px rgba(0,255,255,0.8)', fontFamily: 'monospace'}}, mode === 'login' ? '◉ NEURAL LOGIN' : '◉ NEURAL REGISTER'),
-        React.createElement('form', {onSubmit: handleAuth, className: 'space-y-4'},
-          React.createElement('input', {type: 'text', placeholder: '▶ Neural ID', className: 'w-full p-4 rounded-xl transition-all duration-300', style: {background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(0,255,255,0.5)', color: '#00ffff', fontSize: '16px', fontFamily: 'monospace'}, value: form.username, onChange: e => setForm({...form, username: e.target.value}), onFocus: e => e.target.style.boxShadow = '0 0 20px rgba(0,255,255,0.5)', onBlur: e => e.target.style.boxShadow = 'none'}),
+    return React.createElement('div', {className: 'min-h-screen flex items-center justify-center p-4 sm:p-6', style: {background: 'radial-gradient(circle at 50% 50%, rgba(0,255,255,0.1) 0%, rgba(255,0,255,0.1) 50%, rgba(0,0,0,0.9) 100%)'}},
+      React.createElement('div', {className: 'relative overflow-hidden w-full max-w-sm sm:max-w-md', style: {background: 'linear-gradient(135deg, rgba(0,255,255,0.1) 0%, rgba(255,0,255,0.1) 100%)', backdropFilter: 'blur(20px)', border: '1px solid rgba(0,255,255,0.3)', borderRadius: '20px', padding: window.innerWidth < 640 ? '20px' : '40px', boxShadow: '0 25px 50px rgba(0,255,255,0.2)'}},
+        React.createElement('h1', {className: 'text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-8', style: {color: '#00ffff', textShadow: '0 0 20px rgba(0,255,255,0.8)', fontFamily: 'monospace'}}, mode === 'login' ? '◉ NEURAL LOGIN' : '◉ NEURAL REGISTER'),
+        React.createElement('form', {onSubmit: handleAuth, className: 'space-y-3 sm:space-y-4'},
+          React.createElement('input', {type: 'text', placeholder: '▶ Neural ID', className: 'w-full p-3 sm:p-4 rounded-xl transition-all duration-300', style: {background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(0,255,255,0.5)', color: '#00ffff', fontSize: window.innerWidth < 640 ? '14px' : '16px', fontFamily: 'monospace'}, value: form.username, onChange: e => setForm({...form, username: e.target.value}), onFocus: e => e.target.style.boxShadow = '0 0 20px rgba(0,255,255,0.5)', onBlur: e => e.target.style.boxShadow = 'none'}),
           mode === 'signup' && React.createElement('div', {className: 'space-y-2'},
             React.createElement('div', {className: 'flex gap-2'},
               React.createElement('input', {type: 'email', placeholder: 'Email', className: 'flex-1 p-3 border rounded-xl', value: form.email, onChange: e => setForm({...form, email: e.target.value})}),
@@ -1421,16 +1435,16 @@ function App() {
             'Support: ',
             React.createElement('a', {href: 'mailto:suneethk176@gmail.com', className: 'text-purple-500 hover:text-purple-700'}, 'suneethk176@gmail.com')
           ),
-          React.createElement('p', null, '© 2024 All rights reserved')
+          React.createElement('p', null, '© 2025 All rights reserved')
         )
       )
     );
   }
   
-  return React.createElement('div', {className: 'min-h-screen p-6', style: {background: 'radial-gradient(circle at 20% 80%, rgba(0,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,0,255,0.15) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(0,100,255,0.1) 0%, transparent 50%)'}},
+  return React.createElement('div', {className: 'min-h-screen p-3 sm:p-6', style: {background: 'radial-gradient(circle at 20% 80%, rgba(0,255,255,0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255,0,255,0.15) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(0,100,255,0.1) 0%, transparent 50%)'}},
     React.createElement('div', {className: 'max-w-5xl mx-auto'},
-      React.createElement('header', {className: 'text-center mb-8 relative'},
-        React.createElement('div', {className: 'absolute top-0 left-0'},
+      React.createElement('header', {className: 'text-center mb-6 sm:mb-8 relative'},
+        React.createElement('div', {className: 'absolute top-0 left-0 hidden sm:block'},
           React.createElement('button', {
             onClick: () => setShowSubscription(true),
             className: 'bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-lg transition-all'
@@ -1462,19 +1476,19 @@ function App() {
             )
           )
         ),
-        React.createElement('h1', {className: 'text-6xl font-bold text-center mb-4', style: {background: 'linear-gradient(45deg, #00ffff, #ff00ff, #00ffff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', textShadow: '0 0 30px rgba(0,255,255,0.5)', fontFamily: 'monospace', letterSpacing: '3px'}}, '◉ NEURAL STUDY ◉'),
+        React.createElement('h1', {className: 'text-3xl sm:text-5xl lg:text-6xl font-bold text-center mb-4', style: {background: 'linear-gradient(45deg, #00ffff, #ff00ff, #00ffff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', textShadow: '0 0 30px rgba(0,255,255,0.5)', fontFamily: 'monospace', letterSpacing: window.innerWidth < 640 ? '1px' : '3px'}}, '◉ NEURAL STUDY ◉'),
         React.createElement('p', {className: 'text-gray-600 mt-2'}, 'Welcome back, ' + user.username + '!')
       ),
-      React.createElement('main', {className: 'p-8 rounded-3xl relative overflow-hidden', style: {background: 'linear-gradient(135deg, rgba(0,20,40,0.9) 0%, rgba(20,0,40,0.9) 100%)', backdropFilter: 'blur(20px)', border: '2px solid rgba(0,255,255,0.3)', boxShadow: '0 25px 50px rgba(0,255,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'}},
-        React.createElement('div', {className: 'flex gap-4 mb-8'},
-          React.createElement('input', {type: 'text', placeholder: '▶ Initialize Neural Topic...', className: 'flex-1 p-4 rounded-full text-lg transition-all duration-300', style: {background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(0,255,255,0.5)', color: '#00ffff', fontFamily: 'monospace', fontSize: '18px'}, value: topic, onChange: e => setTopic(e.target.value), onFocus: e => e.target.style.boxShadow = '0 0 30px rgba(0,255,255,0.6)', onBlur: e => e.target.style.boxShadow = 'none'}),
-          React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 rounded-full font-bold transition-all duration-300 transform hover:scale-105', style: {background: loading ? 'rgba(100,100,100,0.5)' : 'linear-gradient(45deg, #00ffff, #ff00ff)', color: '#000', fontFamily: 'monospace', fontSize: '16px', border: '2px solid rgba(0,255,255,0.8)', boxShadow: '0 0 20px rgba(0,255,255,0.5)'}}, loading ? '◉ PROCESSING...' : '▶ GENERATE'),
+      React.createElement('main', {className: 'p-4 sm:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden', style: {background: 'linear-gradient(135deg, rgba(0,20,40,0.9) 0%, rgba(20,0,40,0.9) 100%)', backdropFilter: 'blur(20px)', border: '2px solid rgba(0,255,255,0.3)', boxShadow: '0 25px 50px rgba(0,255,255,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'}},
+        React.createElement('div', {className: 'flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6 sm:mb-8'},
+          React.createElement('input', {type: 'text', placeholder: '▶ Initialize Neural Topic...', className: 'flex-1 w-full p-3 sm:p-4 rounded-full text-base sm:text-lg transition-all duration-300', style: {background: 'rgba(0,0,0,0.8)', border: '2px solid rgba(0,255,255,0.5)', color: '#00ffff', fontFamily: 'monospace', fontSize: window.innerWidth < 640 ? '16px' : '18px'}, value: topic, onChange: e => setTopic(e.target.value), onFocus: e => e.target.style.boxShadow = '0 0 30px rgba(0,255,255,0.6)', onBlur: e => e.target.style.boxShadow = 'none'}),
+          React.createElement('button', {onClick: generate, disabled: loading, className: 'w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-full font-bold transition-all duration-300 transform hover:scale-105', style: {background: loading ? 'rgba(100,100,100,0.5)' : 'linear-gradient(45deg, #00ffff, #ff00ff)', color: '#000', fontFamily: 'monospace', fontSize: window.innerWidth < 640 ? '14px' : '16px', border: '2px solid rgba(0,255,255,0.8)', boxShadow: '0 0 20px rgba(0,255,255,0.5)'}}, loading ? '◉ PROCESSING...' : '▶ GENERATE'),
           React.createElement('div', {className: 'text-sm text-gray-500 flex items-center'}, 'Topics: ' + usedTopics.length + '/1 free')
         ),
-        React.createElement('div', {className: 'flex justify-center mb-8'},
-          React.createElement('div', {className: 'flex bg-gray-100 rounded-full p-1'},
+        React.createElement('div', {className: 'flex justify-center mb-6 sm:mb-8'},
+          React.createElement('div', {className: 'flex bg-gray-100 rounded-full p-1 w-full max-w-md'},
             ['quiz', 'flashcards', 'mindmap'].map(t => 
-              React.createElement('button', {key: t, onClick: () => setTab(t), className: 'px-6 py-2 rounded-full ' + (tab === t ? 'bg-purple-500 text-white' : 'text-gray-600')}, t.charAt(0).toUpperCase() + t.slice(1))
+              React.createElement('button', {key: t, onClick: () => setTab(t), className: 'flex-1 px-2 sm:px-6 py-2 rounded-full text-xs sm:text-sm ' + (tab === t ? 'bg-purple-500 text-white' : 'text-gray-600')}, t.charAt(0).toUpperCase() + t.slice(1))
             )
           )
         ),
@@ -1729,7 +1743,7 @@ function App() {
             'For issues and support: ',
             React.createElement('a', {href: 'mailto:suneethk176@gmail.com', className: 'text-purple-600 hover:text-purple-800'}, 'suneethk176@gmail.com')
           ),
-          React.createElement('p', null, '© 2024 AI Study Companion. All rights reserved.')
+          React.createElement('p', null, '© 2025 AI Study Companion. All rights reserved.')
         )
       )
     )

@@ -240,7 +240,7 @@ const App = () => {
         </main>
         
         <footer className="mt-8 text-center text-sm text-gray-500">
-          <p>Developed by suneethk176 | © 2024 All rights reserved</p>
+          <p>Developed by suneethk176 | © 2025 All rights reserved</p>
         </footer>
       </div>
     </div>

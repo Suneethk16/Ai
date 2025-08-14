@@ -528,7 +528,7 @@ app.get('*', (req, res) => {
             renderContent()
           ),
           React.createElement('footer', { className: 'mt-8 text-center text-sm text-gray-500' },
-            React.createElement('p', null, 'Developed by suneethk176 | © 2024 All rights reserved')
+            React.createElement('p', null, 'Developed by suneethk176 | © 2025 All rights reserved')
           )
         )
       );
