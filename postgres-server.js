@@ -911,9 +911,70 @@ ReactDOM.render(React.createElement(AdminPanel), document.getElementById('root')
 
 app.get('*', (req, res) => {
   res.send(`<!DOCTYPE html>
-<html><head><title>AI Study Companion</title><script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://cdn.tailwindcss.com"></script><script src="https://checkout.razorpay.com/v1/checkout.js"></script></head>
-<body><div id="root"></div><script>
-const {useState} = React;
+<html><head><title>AI Study Companion</title><script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://cdn.tailwindcss.com"></script><script src="https://checkout.razorpay.com/v1/checkout.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script></head>
+<body><div id="root"></div><canvas id="bg-canvas" style="position: fixed; top: 0; left: 0; z-index: -1; width: 100%; height: 100%;"></canvas><script>
+const {useState, useEffect} = React;
+
+// Three.js Background Animation
+let scene, camera, renderer, particles;
+
+function initThreeJS() {
+  const canvas = document.getElementById('bg-canvas');
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  
+  // Create floating particles
+  const geometry = new THREE.BufferGeometry();
+  const positions = [];
+  const colors = [];
+  
+  for (let i = 0; i < 1000; i++) {
+    positions.push((Math.random() - 0.5) * 2000);
+    positions.push((Math.random() - 0.5) * 2000);
+    positions.push((Math.random() - 0.5) * 2000);
+    
+    colors.push(0.5 + Math.random() * 0.5);
+    colors.push(0.3 + Math.random() * 0.7);
+    colors.push(0.8 + Math.random() * 0.2);
+  }
+  
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  
+  const material = new THREE.PointsMaterial({ size: 3, vertexColors: true, transparent: true, opacity: 0.6 });
+  particles = new THREE.Points(geometry, material);
+  scene.add(particles);
+  
+  camera.position.z = 1000;
+  
+  animate();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  
+  if (particles) {
+    particles.rotation.x += 0.0005;
+    particles.rotation.y += 0.001;
+  }
+  
+  renderer.render(scene, camera);
+}
+
+function handleResize() {
+  if (camera && renderer) {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+}
+
+window.addEventListener('resize', handleResize);
+
+// Initialize Three.js when page loads
+setTimeout(initThreeJS, 100);
 function App() {
   const [user, setUser] = useState(null);
   const [mode, setMode] = useState('login');
@@ -1224,8 +1285,8 @@ function App() {
   };
   
   if (!user) {
-    return React.createElement('div', {className: 'min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-6'},
-      React.createElement('div', {className: 'bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md'},
+    return React.createElement('div', {className: 'min-h-screen bg-gradient-to-br from-purple-900/20 to-blue-900/20 backdrop-blur-sm flex items-center justify-center p-6'},
+      React.createElement('div', {className: 'bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-white/20 p-8 w-full max-w-md'},
         React.createElement('h1', {className: 'text-3xl font-bold text-center mb-8'}, mode === 'login' ? 'Welcome Back' : 'Create Account'),
         React.createElement('form', {onSubmit: handleAuth, className: 'space-y-4'},
           React.createElement('input', {type: 'text', placeholder: 'Username', className: 'w-full p-3 border rounded-xl', value: form.username, onChange: e => setForm({...form, username: e.target.value})}),
@@ -1265,7 +1326,7 @@ function App() {
     );
   }
   
-  return React.createElement('div', {className: 'min-h-screen bg-gray-50 p-6'},
+  return React.createElement('div', {className: 'min-h-screen bg-gradient-to-br from-purple-50/30 to-blue-50/30 backdrop-blur-sm p-6'},
     React.createElement('div', {className: 'max-w-5xl mx-auto'},
       React.createElement('header', {className: 'text-center mb-8 relative'},
         React.createElement('div', {className: 'absolute top-0 left-0'},
@@ -1303,7 +1364,7 @@ function App() {
         React.createElement('h1', {className: 'text-5xl font-bold text-purple-800'}, 'AI Study Companion'),
         React.createElement('p', {className: 'text-gray-600 mt-2'}, 'Welcome back, ' + user.username + '!')
       ),
-      React.createElement('main', {className: 'bg-white p-8 rounded-3xl shadow-xl'},
+      React.createElement('main', {className: 'bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-xl border border-white/20'},
         React.createElement('div', {className: 'flex gap-4 mb-8'},
           React.createElement('input', {type: 'text', placeholder: 'Enter topic...', className: 'flex-1 p-4 border-2 border-purple-200 rounded-full text-lg', value: topic, onChange: e => setTopic(e.target.value)}),
           React.createElement('button', {onClick: generate, disabled: loading, className: 'px-8 py-4 bg-purple-600 text-white rounded-full font-bold'}, loading ? 'Generating...' : 'Generate'),
@@ -1346,11 +1407,11 @@ function App() {
             
             const getOptionStyle = (option, correctAnswer) => {
               const selectedOption = selectedAnswers[currentQuestion];
-              if (!selectedOption) return 'bg-white hover:bg-purple-100 cursor-pointer';
+              if (!selectedOption) return 'bg-white/70 hover:bg-purple-100/80 text-gray-800';
               
-              if (option === correctAnswer) return 'bg-green-500 text-white';
-              if (option === selectedOption && option !== correctAnswer) return 'bg-red-500 text-white';
-              return 'bg-white';
+              if (option === correctAnswer) return 'bg-gradient-to-r from-green-400 to-green-600 text-white shadow-lg';
+              if (option === selectedOption && option !== correctAnswer) return 'bg-gradient-to-r from-red-400 to-red-600 text-white shadow-lg';
+              return 'bg-white/50 text-gray-600';
             };
             
             if (quizCompleted) {
@@ -1384,18 +1445,19 @@ function App() {
                 React.createElement('div', {className: 'bg-purple-600 h-2 rounded-full transition-all', style: {width: progress + '%'}})
               ),
               
-              React.createElement('div', {className: 'bg-gray-50 p-6 rounded-xl'},
+              React.createElement('div', {className: 'bg-white/60 backdrop-blur-sm p-6 rounded-xl border border-white/30 shadow-lg'},
                 React.createElement('div', {className: 'flex justify-between items-center mb-4'},
                   React.createElement('span', {className: 'text-sm text-gray-500'}, 'Question ' + (currentQuestion + 1) + ' of ' + limitedContent.length),
                   content.length > maxFreeQuestions && React.createElement('span', {className: 'text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded'}, 'Free: ' + maxFreeQuestions + ' questions')
                 ),
                 
                 React.createElement('p', {className: 'font-bold text-lg mb-4'}, currentQ.question),
-                React.createElement('ul', {className: 'space-y-2 mb-6'}, currentQ.options?.map((option, oIndex) => 
+                React.createElement('ul', {className: 'space-y-3 mb-6'}, currentQ.options?.map((option, oIndex) => 
                   React.createElement('li', {
                     key: oIndex,
-                    className: 'p-3 rounded-lg transition-colors ' + getOptionStyle(option, currentQ.answer),
-                    onClick: () => handleOptionClick(option)
+                    className: 'p-4 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg cursor-pointer border border-white/20 ' + getOptionStyle(option, currentQ.answer),
+                    onClick: () => handleOptionClick(option),
+                    style: { backdropFilter: 'blur(10px)' }
                   }, option)
                 )),
                 
@@ -1416,13 +1478,13 @@ function App() {
             );
           })(),
           tab === 'flashcards' && content.map((item, i) => 
-            React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
+            React.createElement('div', {key: i, className: 'bg-white/60 backdrop-blur-sm p-6 rounded-xl border border-white/30 shadow-lg transform hover:scale-105 transition-all duration-300'},
               React.createElement('p', {className: 'font-bold'}, item.term),
               React.createElement('p', {className: 'text-gray-600'}, item.definition)
             )
           ),
           tab === 'mindmap' && content.map((item, i) => 
-            React.createElement('div', {key: i, className: 'bg-gray-50 p-6 rounded-xl'},
+            React.createElement('div', {key: i, className: 'bg-white/60 backdrop-blur-sm p-6 rounded-xl border border-white/30 shadow-lg transform hover:scale-105 transition-all duration-300'},
               React.createElement('p', {className: 'font-bold'}, item.concept),
               React.createElement('ul', {className: 'mt-2 space-y-1'}, item.related_concepts?.map((rel, j) => React.createElement('li', {key: j, className: 'text-sm text-gray-600'}, '• ' + rel)))
             )
@@ -1446,8 +1508,8 @@ function App() {
             )
           )
         ),
-        showSubscription && React.createElement('div', {className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'},
-          React.createElement('div', {className: 'bg-white p-8 rounded-3xl shadow-2xl max-w-md mx-4'},
+        showSubscription && React.createElement('div', {className: 'fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50'},
+          React.createElement('div', {className: 'bg-white/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white/20 max-w-md mx-4 transform scale-100 animate-pulse'},
             React.createElement('h2', {className: 'text-2xl font-bold text-center mb-4'}, 'Upgrade to Premium'),
             React.createElement('p', {className: 'text-gray-600 text-center mb-6'}, usedTopics.length >= 1 && topic && !usedTopics.includes(topic.toLowerCase().trim()) ? 'Subscribe to unlock quizzes on additional topics!' : 'Subscribe to unlock more questions on this topic!'),
             React.createElement('div', {className: 'space-y-4'},
