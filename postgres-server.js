@@ -145,21 +145,64 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP via multiple email services
+// Send OTP via Gmail SMTP (primary) with Resend fallback
 const sendOTP = async (email, otp) => {
-  // Try Resend first
+  // Try Gmail SMTP first
   try {
-    console.log('Attempting to send email via Resend...');
+    console.log('Attempting to send email via Gmail SMTP...');
     console.log('Target email:', email);
     console.log('OTP:', otp);
-    console.log('API Key available:', !!process.env.RESEND_API_KEY);
     
-    if (!process.env.RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY not configured');
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+      throw new Error('Gmail credentials not configured, trying Resend...');
     }
     
+    const nodemailer = await import('nodemailer');
+    const transporter = nodemailer.default.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS
+      }
+    });
+    
+    const mailOptions = {
+      from: `"AI Study Companion" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Email Verification - AI Study Companion',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #667eea; text-align: center;">🎓 AI Study Companion</h1>
+          <h2 style="color: #333;">Email Verification Required</h2>
+          <p style="font-size: 16px; color: #555;">Please use this verification code to complete your registration:</p>
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; margin: 20px 0; border-radius: 10px; letter-spacing: 3px;">
+            ${otp}
+          </div>
+          <p style="color: #666; font-size: 14px;">⏰ This code expires in 10 minutes</p>
+          <p style="color: #666; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+          <p style="font-size: 12px; color: #999; text-align: center;">Developed by suneethk176 | AI Study Companion</p>
+        </div>
+      `
+    };
+    
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ OTP sent via Gmail to ${email}: ${otp}`);
+    return true;
+    
+  } catch (gmailError) {
+    console.error('❌ Gmail failed:', gmailError.message);
+    
+    // Try Resend as fallback
+    try {
+      console.log('Trying Resend as fallback...');
+      
+      if (!process.env.RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY not configured');
+      }
+    
     const emailData = {
-      from: 'AI Study Companion <onboarding@resend.dev>',
+      from: 'AI Study Companion <noreply@suneethk176.site>',
       to: [email],
       subject: 'Email Verification - AI Study Companion',
       html: `
@@ -211,50 +254,8 @@ const sendOTP = async (email, otp) => {
       
       throw new Error(`Resend failed: ${response.status} - ${JSON.stringify(responseData)}`);
     }
-  } catch (resendError) {
-    console.error('❌ Resend failed:', resendError.message);
-    
-    // Try backup email service (Gmail SMTP)
-    try {
-      console.log('Trying backup email service...');
-      
-      if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
-        throw new Error('Gmail credentials not configured');
-      }
-      
-      const nodemailer = await import('nodemailer');
-      const transporter = nodemailer.default.createTransporter({
-        service: 'gmail',
-        auth: {
-          user: process.env.GMAIL_USER,
-          pass: process.env.GMAIL_PASS
-        }
-      });
-      
-      const mailOptions = {
-        from: `"AI Study Companion" <${process.env.GMAIL_USER}>`,
-        to: email,
-        subject: 'Email Verification - AI Study Companion',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h1 style="color: #667eea; text-align: center;">🎓 AI Study Companion</h1>
-            <h2 style="color: #333;">Email Verification Required</h2>
-            <p style="font-size: 16px; color: #555;">Please use this verification code to complete your registration:</p>
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; margin: 20px 0; border-radius: 10px; letter-spacing: 3px;">
-              ${otp}
-            </div>
-            <p style="color: #666; font-size: 14px;">⏰ This code expires in 10 minutes</p>
-            <p style="color: #666; font-size: 14px;">If you didn't request this verification, please ignore this email.</p>
-          </div>
-        `
-      };
-      
-      await transporter.sendMail(mailOptions);
-      console.log(`✅ OTP sent via Gmail to ${email}: ${otp}`);
-      return true;
-      
-    } catch (gmailError) {
-      console.error('❌ Gmail backup failed:', gmailError.message);
+    } catch (resendError) {
+      console.error('❌ Resend fallback failed:', resendError.message);
       console.log('='.repeat(50));
       console.log(`📧 FALLBACK - OTP for ${email}: ${otp}`);
       console.log('='.repeat(50));
